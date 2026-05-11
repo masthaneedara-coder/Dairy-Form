@@ -18,8 +18,10 @@ export default function Subscribe() {
     });
   };
 
- const handleSubmit = async () => {
+const handleSubmit = async () => {
+
   try {
+
     await fetch(
       "https://script.google.com/macros/s/AKfycbwmjV0AbgvH0OEls83NDUu7Oct_n9ZPcbx-RN96Gxcwjgr_q2pIM3lUafDrcHlHrB5T/exec",
       {
@@ -32,19 +34,13 @@ export default function Subscribe() {
       }
     );
 
-    alert("Subscription Saved!");
-
-     setFormData({
-      name: "",
-      liters: "",
-      date: "",
-      cost: "",
-    });
-
+    alert("Saved Successfully");
 
   } catch (error) {
+
     console.log(error);
-    alert("Failed To Save");
+    alert("Error");
+
   }
 };
 
