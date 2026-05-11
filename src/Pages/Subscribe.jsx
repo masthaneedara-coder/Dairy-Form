@@ -34,12 +34,13 @@ export default function Subscribe() {
 
     alert("Subscription Saved!");
 
-    setFormData({
+     setFormData({
       name: "",
-      mobile: "",
-      address: "",
-      plan: selectedPlan || "",
+      liters: "",
+      date: "",
+      cost: "",
     });
+
 
   } catch (error) {
     console.log(error);
