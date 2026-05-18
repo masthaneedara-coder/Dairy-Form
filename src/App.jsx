@@ -1,24 +1,46 @@
+import { useEffect, useState } from "react";
+
 export default function FarmFreshDairyWebsite() {
-  const products = [
-    {
-      name: "Cow Milk",
-      price: "₹60/L",
-      image:
-        "https://images.unsplash.com/photo-1563636619-e9143da7973b?q=80&w=1200&auto=format&fit=crop",
-    },
-    {
-      name: "Buffalo Milk",
-      price: "₹80/L",
-      image:
-        "https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=1200&auto=format&fit=crop",
-    },
-    {
-      name: "Fresh Curd",
-      price: "₹50/Box",
-      image:
-        "https://images.unsplash.com/photo-1488477181946-6428a0291777?q=80&w=1200&auto=format&fit=crop",
-    },
-  ];
+  const [products, setProducts] = useState([]);
+  // GOOGLE APPS SCRIPT URL
+  const SCRIPT_URL =
+    "https://script.google.com/macros/s/AKfycbwDo-NO1_Ul5WQNUvsUowPQG2rgebzgX47SGyfJFTa5m6vdKqk01TAdc6KC9rhZs_yD/exec";
+
+    // FETCH PRODUCTS
+  useEffect(() => {
+
+    fetch(SCRIPT_URL)
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(data);
+      })
+      .catch((err) => {
+        console.log(err);
+        alert("Failed to load products");
+      });
+
+  }, []);
+
+  // const products = [
+  //   {
+  //     name: "Cow Milk",
+  //     price: "₹60/L",
+  //     image:
+  //       "https://images.unsplash.com/photo-1563636619-e9143da7973b?q=80&w=1200&auto=format&fit=crop",
+  //   },
+  //   {
+  //     name: "Buffalo Milk",
+  //     price: "₹80/L",
+  //     image:
+  //       "https://images.unsplash.com/photo-1550583724-b2692b85b150?q=80&w=1200&auto=format&fit=crop",
+  //   },
+  //   {
+  //     name: "Fresh Curd",
+  //     price: "₹50/Box",
+  //     image:
+  //       "https://images.unsplash.com/photo-1488477181946-6428a0291777?q=80&w=1200&auto=format&fit=crop",
+  //   },
+  // ];
 
   const plans = [
     {
@@ -90,6 +112,72 @@ export default function FarmFreshDairyWebsite() {
   const razor = new window.Razorpay(options);
   razor.open();
 };
+const handleOrder = async (product, qty) => {
+
+    if (!qty || qty <= 0) {
+
+      alert("Please enter quantity");
+
+      return;
+    }
+
+    if (qty > product.stock) {
+
+      alert(
+        `Only ${product.stock}L available`
+      );
+
+      return;
+    }
+
+    try {
+
+      const response = await fetch(
+        SCRIPT_URL,
+        {
+          method: "POST",
+
+          body: JSON.stringify({
+            product: product.name,
+            qty: qty,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+
+        alert("Order Successful");
+
+        const updatedProducts =
+          products.map((p) => {
+
+            if (p.name === product.name) {
+
+              return {
+                ...p,
+                stock: data.stock,
+              };
+            }
+
+            return p;
+          });
+
+        setProducts(updatedProducts);
+
+      } else {
+
+        alert("Order Failed");
+      }
+
+    } catch (error) {
+
+      console.log(error);
+
+      alert("Error placing order");
+    }
+  };
 
   return (
     
@@ -115,7 +203,14 @@ export default function FarmFreshDairyWebsite() {
             <a href="#contact" className="hover:text-green-600">Contact</a>
           </nav>
 
-          <button className="bg-green-600 hover:bg-green-700 transition text-white px-5 py-2 rounded-xl shadow-lg">
+          <button
+            onClick={() => {
+              document
+                .getElementById("products")
+                .scrollIntoView({ behavior: "smooth" });
+            }}
+            className="bg-green-600 hover:bg-green-700 transition text-white px-5 py-2 rounded-xl shadow-lg"
+          >
             Order Now
           </button>
         </div>
@@ -208,31 +303,133 @@ export default function FarmFreshDairyWebsite() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {products.map((product, index) => (
-              <div
-                key={index}
-                className="rounded-3xl overflow-hidden bg-white shadow-xl border border-gray-100 hover:-translate-y-2 transition duration-300"
-              >
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="h-72 w-full object-cover"
-                />
+         <div className="grid md:grid-cols-3 gap-8">
 
-                <div className="p-6">
-                  <h3 className="text-2xl font-bold">{product.name}</h3>
-                  <p className="text-green-600 text-xl font-semibold mt-2">
-                    {product.price}
-                  </p>
+              {products.map((product, index) => {
 
-                  <button className="mt-5 w-full bg-green-600 hover:bg-green-700 transition text-white py-3 rounded-2xl font-semibold">
-                    Add To Subscription
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+                const price =
+                  product.name === "Cow Milk"
+                    ? 60
+                    : product.name === "Buffalo Milk"
+                    ? 80
+                    : 50;
+
+                return (
+
+                  <div
+                    key={index}
+                    className="rounded-3xl overflow-hidden bg-white shadow-xl border border-gray-100 hover:-translate-y-2 transition duration-300"
+                  >
+
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="h-72 w-full object-cover"
+                    />
+
+                    <div className="p-6">
+
+                      <h3 className="text-2xl font-bold">
+                        {product.name}
+                      </h3>
+
+                      <p className="text-green-600 text-xl font-semibold mt-2">
+                        ₹{product.price} / L
+                      </p>
+                      {/* STOCK */}
+                  <div className="mt-3">
+
+                    {product.stock > 0 ? (
+
+                      <div className="inline-block bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-bold">
+                        In Stock : {product.stock}L
+                      </div>
+
+                    ) : (
+
+                      <div className="inline-block bg-red-100 text-red-700 px-4 py-2 rounded-full text-sm font-bold">
+                        Out Of Stock
+                      </div>
+
+                    )}
+
+                  </div>
+
+                      <div className="mt-5 space-y-4">
+
+                        <input                          
+                          id={`qty-${index}`}
+                          type="number"
+                          min="1"
+                          placeholder="Enter Quantity / Liters"
+                          className="w-full border border-gray-300 rounded-2xl px-4 py-3"
+                          onChange={(e) => {
+
+                            const qty = Number(e.target.value);
+                            const total = qty * price;
+
+                            document.getElementById(
+                              `total-${index}`
+                            ).innerText = `Total Price: ₹${total}`;
+                          }}
+                        />
+
+                        <div
+                          id={`total-${index}`}
+                          className="text-xl font-bold text-green-700"
+                        >
+                          Total Price: ₹0
+                        </div>
+                       <button
+                          disabled={product.stock <= 0}
+                          onClick={() => {
+
+                            const qty = Number(
+                              document.getElementById(
+                                `qty-${index}`
+                              ).value
+                            );
+
+                            if (!qty || qty <= 0) {
+
+                              alert("Please Enter Quantity");
+
+                              return;
+                            }
+
+                            /* REDIRECT PAGE */
+
+                            window.location.href =
+                              `/subscribe?product=${product.name}&qty=${qty}`;
+
+                            /* SAVE ORDER FUNCTION */
+
+                            handleOrder(product, qty);
+
+                          }}
+                          className={`w-full py-3 rounded-2xl font-semibold text-white transition ${
+                            product.stock > 0
+                              ? "bg-green-600 hover:bg-green-700"
+                              : "bg-gray-400 cursor-not-allowed"
+                          }`}
+                        >
+
+                          {product.stock > 0
+                            ? "Order Now"
+                            : "Out Of Stock"}
+
+                       </button>                       
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                );
+              })}
+
+            </div>
         </div>
       </section>
 
@@ -283,7 +480,7 @@ export default function FarmFreshDairyWebsite() {
       </section>
 
       {/* LOGO SECTION */}
-      <section className="py-20 bg-white">
+      <section id="products" className="py-20">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-14">
             <h2 className="text-4xl font-black">Dairy Brand Logo</h2>
