@@ -133,7 +133,7 @@ export default function FarmFreshDairyWebsite() {
       </p>
 
       <div className="mt-10 flex gap-5">
-        <button
+        <button aria-label="Subscribe Now"
           onClick={() => {
             document
               .getElementById("plans")
@@ -144,7 +144,7 @@ export default function FarmFreshDairyWebsite() {
           Subscribe Now
         </button>
 
-        <button
+        <button aria-label="WhatsApp Order"
           onClick={() => {
             window.open("https://wa.me/919989663837");
           }}
