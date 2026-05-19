@@ -433,7 +433,6 @@ export default function FarmFreshDairyWebsite() {
                         alert("Please enter quantity");
                         return;
                       }
-
                         window.location.assign(
                         `/subscribe?product=${product.name}&qty=${qty}`
                         );
