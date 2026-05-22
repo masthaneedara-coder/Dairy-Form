@@ -1,9 +1,47 @@
 import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
 import heroImage from "../assets/logo3.png";
+import { auth } from "../firebase";
+
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+} from "firebase/auth";
+
 
 export default function FarmFreshDairyWebsite() {
   const [products, setProducts] = useState([]);
+  const [quantity, setQuantity] =
+  useState({});
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [subscriptions, setSubscriptions] = useState([
+  {
+    id: 1,
+    product: "Buffalo Milk",
+    qty: 1,
+    price: 80,
+    status: "Active",
+    slot: "Morning",
+    skipTomorrow: false,
+    days: [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+    ],
+  },
+]);
+
+const [walletBalance, setWalletBalance] =
+  useState(1250);
+  
+const monthlyBill = subscriptions.reduce(
+  (total, item) =>
+    total + item.qty * item.price * 30,
+  0
+);  
 
   const SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbwDo-NO1_Ul5WQNUvsUowPQG2rgebzgX47SGyfJFTa5m6vdKqk01TAdc6KC9rhZs_yD/exec";
@@ -18,10 +56,191 @@ export default function FarmFreshDairyWebsite() {
         console.log(err);
       });
   }, []);
+  useEffect(() => {
 
-  const handlePayment = (amount, planName) => {
+  const hash =
+    window.location.hash;
+
+  if (hash) {
+
+    setTimeout(() => {
+
+      const element =
+        document.querySelector(hash);
+
+      if (element) {
+
+        element.scrollIntoView({
+          behavior: "smooth",
+        });
+
+      }
+
+    }, 500);
+
+  }
+
+}, []);
+  
+  useEffect(() => {
+
+  const handler = (e) => {
+
+    e.preventDefault();
+
+    setDeferredPrompt(e);
+
+  };
+
+  window.addEventListener(
+    "beforeinstallprompt",
+    handler
+  );
+
+  return () =>
+    window.removeEventListener(
+      "beforeinstallprompt",
+      handler
+    );
+
+}, []);
+  useEffect(() => {
+
+  const enableNotifications =
+    async () => {
+
+    if (
+      "Notification" in window
+    ) {
+
+      const permission =
+        await Notification.requestPermission();
+
+      console.log(
+        "Notification Permission:",
+        permission
+      );
+
+      if (
+        permission === "granted"
+      ) {
+
+        console.log(
+          "Notifications Enabled"
+        );
+
+      }
+
+    }
+
+  };
+
+  enableNotifications();
+
+}, []);
+useEffect(() => {
+
+  const loginStatus =
+    localStorage.getItem(
+      "customerLogin"
+    );
+
+  if (loginStatus === "true") {
+
+    setIsLoggedIn(true);
+
+    setCustomerName(
+      localStorage.getItem(
+        "customerName"
+      ) || ""
+    );
+
+    setCustomerPhone(
+      localStorage.getItem(
+        "customerPhone"
+      ) || ""
+    );
+
+  }
+
+}, []);
+  useEffect(() => {
+
+  const statuses = [
+    "Preparing",
+    "Out For Delivery",
+    "Reached Nearby",
+    "Delivered",
+  ];
+
+  let index = 0;
+
+  const interval = setInterval(() => {
+
+    index++;
+
+    if (index < statuses.length) {
+
+      setDeliveryStatus(
+        statuses[index]
+      );
+
+    } else {
+
+      clearInterval(interval);
+
+    }
+
+  }, 5000);
+
+  return () =>
+    clearInterval(interval);
+
+}, []);
+
+  const handlePayment = (price) => {
+
   const options = {
-    key: "YOUR_RAZORPAY_KEY_ID",
+
+    key: "rzp_live_SryV51ja9BVho8",
+
+    amount: price * 100,
+
+    currency: "INR",
+
+    name: "Farm Fresh Dairy",
+
+    description: "Milk Subscription",
+
+    image: logo,
+
+    handler: function (response) {
+
+      alert(
+        `Payment Successful ₹${price}`
+      );
+
+      console.log(response);
+
+    },
+
+    theme: {
+      color: "#16a34a",
+    },
+
+  };
+
+  const razorpay =
+    new window.Razorpay(options);
+
+  razorpay.open();
+
+};
+const rechargeWallet = (amount) => {
+
+  const options = {
+
+    key: "rzp_live_SryV51ja9BVho8",
 
     amount: amount * 100,
 
@@ -29,79 +248,386 @@ export default function FarmFreshDairyWebsite() {
 
     name: "Farm Fresh Dairy",
 
-    description: planName,
+    description: "Wallet Recharge",
 
     image: logo,
 
     handler: function (response) {
+
+      setWalletBalance(
+        (prev) => prev + amount
+      );
+
       alert(
-        "Payment Successful\nPayment ID: " +
-          response.razorpay_payment_id
+        `Wallet Recharged Successfully\n₹${amount} Added`
       );
     },
 
     theme: {
       color: "#16a34a",
     },
+
   };
 
   const razor = new window.Razorpay(options);
 
   razor.open();
 };
+const addSubscription = (product) => {
 
+  const newSubscription = {
+
+    id: Date.now(),
+
+    product: product.name,
+
+    qty: 1,
+
+    price: product.price,
+
+    status: "Active",
+
+    slot: "Morning",
+
+    skipTomorrow: false,
+
+    days: [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+    ],
+
+  };
+
+  setSubscriptions([
+    ...subscriptions,
+    newSubscription,
+  ]);
+
+};
   const plans = [
-    {
-      title: "Starter Plan",
-      qty: "500ml Daily",
-      price: "₹900 / Month",
-    },
-    {
-      title: "Family Plan",
-      qty: "1L Daily",
-      price: "₹1800 / Month",
-    },
-    {
-      title: "Premium Plan",
-      qty: "2L Daily",
-      price: "₹3500 / Month",
-    },
-  ];
 
-  return (
+  {
+    title: "Starter Plan",
+    qty: "500ml Daily",
+    price: 900,
+  },
+
+  {
+    title: "Family Plan",
+    qty: "1L Daily",
+    price: 1800,
+  },
+
+  {
+    title: "Premium Plan",
+    qty: "2L Daily",
+    price: 3500,
+  },
+
+];
+
+
+  const subscriptionProducts = [
+  {
+    name: "Cow Milk",
+    price: 60,
+  },
+
+  {
+    name: "Buffalo Milk",
+    price: 80,
+  },
+
+  {
+    name: "Fresh Curd",
+    price: 120,
+  },
+
+  {
+    name: "Paneer",
+    price: 350,
+  },
+];
+  const today = new Date();
+
+const upcomingDays = [...Array(7)].map((_, i) => {
+
+  const date = new Date();
+
+  date.setDate(today.getDate() + i);
+
+  return {
+    day: date.toLocaleDateString("en-US", {
+      weekday: "short",
+    }),
+
+    date: date.getDate(),
+  };
+
+});
+const [orderHistory] = useState([
+  {
+    id: 1,
+    product: "Buffalo Milk",
+    qty: 2,
+    amount: 160,
+    status: "Delivered",
+    date: "12 May 2026",
+  },
+
+  {
+    id: 2,
+    product: "Cow Milk",
+    qty: 1,
+    amount: 60,
+    status: "Delivered",
+    date: "11 May 2026",
+  },
+
+  {
+    id: 3,
+    product: "Fresh Curd",
+    qty: 1,
+    amount: 120,
+    status: "Processing",
+    date: "10 May 2026",
+  },
+]);
+const [notifications, setNotifications] =
+  useState([
+    {
+      id: 1,
+      title: "Milk Delivered",
+      message:
+        "Your Buffalo Milk was delivered successfully.",
+      type: "success",
+    },
+
+    {
+      id: 2,
+      title: "Wallet Low",
+      message:
+        "Recharge wallet to continue delivery.",
+      type: "warning",
+    },
+
+    {
+      id: 3,
+      title: "Subscription Active",
+      message:
+        "Your Family Plan is active.",
+      type: "info",
+    },
+  ]);
+const [deliveryStatus, setDeliveryStatus] =
+  useState("Preparing");
+
+const deliverySteps = [
+  "Preparing",
+  "Out For Delivery",
+  "Reached Nearby",
+  "Delivered",
+];
+  const [showLogin, setShowLogin] =
+  useState(false);
+
+const [phone, setPhone] =
+  useState("");
+
+const [otp, setOtp] =
+  useState("");
+
+const [generatedOtp, setGeneratedOtp] =
+  useState("");
+
+const [isLoggedIn, setIsLoggedIn] =
+  useState(false);
+  const [customerName,
+  setCustomerName] =
+  useState("");
+
+const [customerPhone,
+  setCustomerPhone] =
+  useState("");
+  const sendOtp = async () => {
+
+  try {
+
+    if (!phone) {
+      alert("Enter phone number");
+      return;
+    }
+
+    window.recaptchaVerifier =
+      new RecaptchaVerifier(
+        auth,
+        "recaptcha-container",
+        {}
+      );
+
+    const appVerifier =
+      window.recaptchaVerifier;
+
+    const confirmationResult =
+      await signInWithPhoneNumber(
+        auth,
+        `+91${phone}`,
+        appVerifier
+      );
+
+    window.confirmationResult =
+      confirmationResult;
+
+    alert("OTP Sent Successfully");
+
+  } catch (error) {
+
+    console.log(error);
+
+    alert(error.message);
+
+  }
+
+};
+const verifyOtp = async () => {
+  
+
+  try {
+
+    await window.confirmationResult.confirm(otp);
+    localStorage.setItem(
+        "customerLogin",
+        "true"
+      );
+
+      localStorage.setItem(
+        "userRole",
+        "customer"
+      );
+
+      localStorage.setItem(
+        "customerPhone",
+        phone
+      );
+
+    setIsLoggedIn(true);
+
+    setShowLogin(false);
+
+    alert("Login Successful");
+
+  } catch (error) {
+
+    console.log(error);
+
+    alert("Invalid OTP");
+
+  }  
+
+};
+const testNotification = () => {
+
+  if (
+    Notification.permission ===
+    "granted"
+  ) {
+
+    new Notification(
+      "🥛 Farm Fresh Dairy",
+      {
+
+        body:
+          "Your milk delivery is on the way 🚚",
+
+        icon: "/logo.png",
+
+      }
+    );
+
+  } else {
+
+    alert(
+      "Notification permission not granted"
+    );
+
+  }
+
+};
+const installApp = async () => {
+
+  if (!deferredPrompt) {
+
+    alert(
+      "Install not available yet"
+    );
+
+    return;
+
+  }
+
+  deferredPrompt.prompt();
+
+  const choiceResult =
+    await deferredPrompt.userChoice;
+
+  if (
+    choiceResult.outcome ===
+    "accepted"
+  ) {
+
+    console.log(
+      "App Installed"
+    );
+
+  }
+
+  setDeferredPrompt(null);
+
+};
+const handleLogin = () => {
+
+  if (
+    !customerName ||
+    !customerPhone
+  ) {
+
+    alert(
+      "Please fill all fields"
+    );
+
+    return;
+
+  }
+
+  setIsLoggedIn(true);
+
+  localStorage.setItem(
+    "customerLogin",
+    "true"
+  );
+
+  localStorage.setItem(
+    "customerName",
+    customerName
+  );
+
+  localStorage.setItem(
+    "customerPhone",
+    customerPhone
+  );
+
+};
+
+  return (   
+    
+    
     <div className="min-h-screen bg-white text-gray-800">
       {/* HEADER */}
-      <header className="sticky top-0 z-50 bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img
-                src={logo}
-                alt="Farm Fresh Dairy"
-                className="w-16 h-16 rounded-full object-cover shadow-lg"/>
-
-            <div>
-              <h1 className="font-bold text-2xl">
-                Farm Fresh Dairy
-              </h1>
-
-              <p className="text-gray-500">
-                Pure Milk Delivered Daily
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => {
-              document
-                .getElementById("products")
-                .scrollIntoView({ behavior: "smooth" });
-            }}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-2xl font-bold shadow-xl"
-          >
-            Order Now
-          </button>
-        </div>
-      </header>
+      
 
       {/* HERO */}
       <section className="relative overflow-hidden">
@@ -152,230 +678,210 @@ export default function FarmFreshDairyWebsite() {
         >
           WhatsApp Order
         </button>
+        <button
+          onClick={testNotification}
+          className="bg-blue-600 hover:bg-blue-700 px-8 py-4 rounded-2xl font-bold text-white"
+        >
+          Test Notification
+        </button>
+        <button
+            onClick={installApp}
+            className="bg-black hover:bg-gray-800 px-8 py-4 rounded-2xl font-bold text-white"
+          >
+            📱 Install App
+          </button>
       </div>
     </div>
   </div>
-</section>
-      {/* FEATURES */}
-      <section className="py-16 bg-gray-50">
-        {/* FEATURES SECTION */}
+</section>   
+  {/* FEATURES */}
+      {/* SMART FEATURES SECTION */}
+
+<section className="py-24 bg-gradient-to-b from-green-50 to-white">
+
+  <div className="max-w-7xl mx-auto px-6">
+
+    {/* HEADING */}
+
+    <div className="text-center mb-16">
+
+      <h2 className="text-5xl font-black text-green-700">
+        Smart Dairy Features
+      </h2>
+
+      <p className="mt-5 text-xl text-gray-600">
+        Advanced milk delivery platform with
+        smart technology and automation.
+      </p>
+
+    </div>
+
+    {/* FEATURE GRID */}
+
+    <div className="grid md:grid-cols-3 gap-10">
+
+      {/* CARD 1 */}
+
+      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-green-100">
+
+        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-4xl text-white shadow-lg">
+          📱
+        </div>
+
+        <h3 className="text-3xl font-black mt-8 text-gray-800">
+          Android & iOS Apps
+        </h3>
+
+        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
+          Order fresh milk directly from
+          mobile apps with live tracking.
+        </p>
+
+      </div>
+
+      {/* CARD 2 */}
+
 <div
-  style={{
-    width: "90%",
-    maxWidth: "1250px",
-    margin: "-120px auto 40px",
-    background: "#ffffff",
-    borderRadius: "35px",
-    padding: "30px 15px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    boxShadow: "0 10px 35px rgba(0,0,0,0.18)",
-    position: "relative",
-    zIndex: "20",
+  onClick={() => {
+    document
+      .getElementById("subscriptions")
+      .scrollIntoView({
+        behavior: "smooth",
+      });
   }}
+  className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-blue-100 cursor-pointer"
 >
-  {/* FEATURE 1 */}
-  <div
-    style={{
-      flex: "1",
-      minWidth: "220px",
-      textAlign: "center",
-      padding: "10px",
-      borderRight: "1px solid #e5e5e5",
-    }}
-  >
-    <div
-      style={{
-        width: "90px",
-        height: "90px",
-        margin: "0 auto 15px",
-        borderRadius: "50%",
-        background: "#e8f8e8",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "42px",
-      }}
-    >
-      🌿
-    </div>
 
-    <h3
-      style={{
-        color: "#169447",
-        fontSize: "22px",
-        fontWeight: "700",
-        marginBottom: "10px",
-      }}
-    >
-      100% Organic
-    </h3>
-
-    <p
-      style={{
-        color: "#444",
-        fontSize: "17px",
-        lineHeight: "1.7",
-      }}
-    >
-      No chemicals &
-      <br />
-      preservatives
-    </p>
+  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-4xl text-white shadow-lg">
+    🔄
   </div>
 
-  {/* FEATURE 2 */}
-  <div
-    style={{
-      flex: "1",
-      minWidth: "220px",
-      textAlign: "center",
-      padding: "10px",
-      borderRight: "1px solid #e5e5e5",
-    }}
-  >
-    <div
-      style={{
-        width: "90px",
-        height: "90px",
-        margin: "0 auto 15px",
-        borderRadius: "50%",
-        background: "#e8f0ff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "42px",
-      }}
-    >
-      🥛
+  <h3 className="text-3xl font-black mt-8 text-gray-800">
+    Subscription Delivery
+  </h3>
+
+  <p className="text-gray-600 mt-4 text-lg leading-relaxed">
+    Daily automatic milk delivery
+    with flexible subscription plans.
+  </p>
+
+  <div className="mt-8 space-y-4">
+
+    <div className="flex items-center gap-3">
+      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
+        ✓
+      </div>
+
+      <span className="text-gray-700 font-semibold">
+        Auto Daily Delivery
+      </span>
     </div>
 
-    <h3
-      style={{
-        color: "#2563eb",
-        fontSize: "22px",
-        fontWeight: "700",
-        marginBottom: "10px",
-      }}
-    >
-      Pure & Fresh
-    </h3>
+    <div className="flex items-center gap-3">
+      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
+        ✓
+      </div>
 
-    <p
-      style={{
-        color: "#444",
-        fontSize: "17px",
-        lineHeight: "1.7",
-      }}
-    >
-      Hygienic &
-      <br />
-      premium quality
-    </p>
-  </div>
-
-  {/* FEATURE 3 */}
-  <div
-    style={{
-      flex: "1",
-      minWidth: "220px",
-      textAlign: "center",
-      padding: "10px",
-      borderRight: "1px solid #e5e5e5",
-    }}
-  >
-    <div
-      style={{
-        width: "90px",
-        height: "90px",
-        margin: "0 auto 15px",
-        borderRadius: "50%",
-        background: "#fff3df",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "42px",
-      }}
-    >
-      🚚
+      <span className="text-gray-700 font-semibold">
+        Pause & Resume Anytime
+      </span>
     </div>
 
-    <h3
-      style={{
-        color: "#d97706",
-        fontSize: "22px",
-        fontWeight: "700",
-        marginBottom: "10px",
-      }}
-    >
-      Farm Direct
-    </h3>
+    <div className="flex items-center gap-3">
+      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
+        ✓
+      </div>
 
-    <p
-      style={{
-        color: "#444",
-        fontSize: "17px",
-        lineHeight: "1.7",
-      }}
-    >
-      Straight from
-      <br />
-      our farm
-    </p>
-  </div>
-
-  {/* FEATURE 4 */}
-  <div
-    style={{
-      flex: "1",
-      minWidth: "220px",
-      textAlign: "center",
-      padding: "10px",
-    }}
-  >
-    <div
-      style={{
-        width: "90px",
-        height: "90px",
-        margin: "0 auto 15px",
-        borderRadius: "50%",
-        background: "#ffe8ef",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "42px",
-      }}
-    >
-      ❤️
+      <span className="text-gray-700 font-semibold">
+        Flexible Quantity Change
+      </span>
     </div>
 
-    <h3
-      style={{
-        color: "#e11d48",
-        fontSize: "22px",
-        fontWeight: "700",
-        marginBottom: "10px",
-      }}
-    >
-      Healthy & Nutritious
-    </h3>
-
-    <p
-      style={{
-        color: "#444",
-        fontSize: "17px",
-        lineHeight: "1.7",
-      }}
-    >
-      Goodness in
-      <br />
-      every drop
-    </p>
   </div>
+
 </div>
-      </section>
+
+      {/* CARD 3 */}
+
+      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-purple-100">
+
+        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-4xl text-white shadow-lg">
+          💳
+        </div>
+
+        <h3 className="text-3xl font-black mt-8 text-gray-800">
+          Wallet & Payments
+        </h3>
+
+        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
+          Recharge wallet and make
+          secure online payments instantly.
+        </p>
+
+      </div>
+
+      {/* CARD 4 */}
+
+      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-yellow-100">
+
+        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-4xl text-white shadow-lg">
+          🚚
+        </div>
+
+        <h3 className="text-3xl font-black mt-8 text-gray-800">
+          Delivery Time Slots
+        </h3>
+
+        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
+          Choose morning or evening
+          delivery according to your schedule.
+        </p>
+
+      </div>
+
+      {/* CARD 5 */}
+
+      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-pink-100">
+
+        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-400 to-red-500 flex items-center justify-center text-4xl text-white shadow-lg">
+          🎟️
+        </div>
+
+        <h3 className="text-3xl font-black mt-8 text-gray-800">
+          Discount Coupons
+        </h3>
+
+        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
+          Save more using subscription
+          offers and discount coupons.
+        </p>
+
+      </div>
+
+      {/* CARD 6 */}
+
+      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-orange-100">
+
+        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-4xl text-white shadow-lg">
+          🔔
+        </div>
+
+        <h3 className="text-3xl font-black mt-8 text-gray-800">
+          Order Reminders
+        </h3>
+
+        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
+          Get smart notifications and
+          reminders for daily delivery.
+        </p>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
 
       {/* PRODUCTS */}
       <section id="products" className="py-20">
@@ -416,30 +922,64 @@ export default function FarmFreshDairyWebsite() {
                   </div>
 
                   <input
-                    id={`qty-${index}`}
-                    type="number"
-                    min="1"
-                    placeholder="Enter Quantity / Liters"
-                    className="w-full border rounded-2xl px-5 py-4 mt-6"
-                  />
+                        type="number"
+                        min="1"
+                        placeholder="Enter Quantity / Liters"
+                        value={
+                          quantity[product.name] || ""
+                        }
+                        onChange={(e) =>
+                          setQuantity({
+                            ...quantity,
+                            [product.name]:
+                              Number(e.target.value),
+                          })
+                        }
+                        className="w-full border rounded-2xl px-5 py-4 mt-6"
+                      />
 
-                  <button
+                 <button
                     onClick={() => {
-                      const qty = document.getElementById(
-                        `qty-${index}`
-                      ).value;
+
+                      const isLoggedIn =
+                        localStorage.getItem(
+                          "customerLogin"
+                        ) === "true";
+
+                      if (!isLoggedIn) {
+
+                        setShowLogin(true);
+
+                        return;
+
+                      }
+
+                      const qty =
+                        quantity[product.name];
 
                       if (!qty || qty <= 0) {
-                        alert("Please enter quantity");
-                        return;
-                      }
-                        window.location.assign(
-                        `/subscribe?product=${product.name}&qty=${qty}`
+
+                        alert(
+                          "Please enter quantity"
                         );
+
+                        return;
+
+                      }
+
+                      const totalPrice =
+                        Number(product.price) *
+                        Number(qty);
+
+                      window.location.href =
+                        `/subscribe?product=${encodeURIComponent(product.name)}&qty=${qty}&price=${totalPrice}`;
+
                     }}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-bold text-lg mt-6"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-bold mt-6"
                   >
+
                     Order Now
+
                   </button>
                 </div>
               </div>
@@ -479,16 +1019,16 @@ export default function FarmFreshDairyWebsite() {
                 </p>
 
                 <div className="text-6xl font-black text-green-600 mt-10">
-                  {plan.price}
+                  ₹{plan.price} / Month
                 </div>
 
                 <button
-                    onClick={() =>
-                        handlePayment(999, "Monthly Buffalo Milk Plan")
-                    }
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl"
-                    >
-                    Choose Plan
+                  onClick={() =>
+                    handlePayment(plan.price)
+                  }
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-2xl font-bold"
+                >
+                  Choose Plan
                 </button>
               </div>
             ))}
@@ -509,7 +1049,7 @@ export default function FarmFreshDairyWebsite() {
             <img
             src={logo}
             alt="Farm Fresh Dairy"
-            className="w-90 h-90 object-contain"
+            className="w-72 h-72 object-contain"
             />
 
         </div>
@@ -532,7 +1072,7 @@ export default function FarmFreshDairyWebsite() {
 
       </div>
 
-      DESCRIPTION
+      {/* DESCRIPTION */}
       <p className="mt-8 text-gray-600 text-xl leading-9 max-w-2xl mx-auto">
         Fresh farm milk delivered daily with hygienic packaging,
         premium quality, and natural nutrition for your family.
@@ -680,7 +1220,37 @@ export default function FarmFreshDairyWebsite() {
               </div>
             </div>
 
-            <button className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg">
+            <button className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg"
+              onClick={() => {
+
+                    const isLoggedIn =
+                      localStorage.getItem(
+                        "customerLogin"
+                      ) === "true";
+
+                    if (!isLoggedIn) {
+
+                      alert(
+                        "Please login first"
+                      );
+
+                      window.location.href =
+                        "/auth";
+
+                      return;
+
+                    }
+
+                    document
+                      .getElementById(
+                        "subscriptions"
+                      )
+                      ?.scrollIntoView({
+                        behavior: "smooth",
+                      });
+
+                  }}
+                  >
               Subscribe Now
             </button>
           </div>
@@ -690,7 +1260,7 @@ export default function FarmFreshDairyWebsite() {
   </div>
 </section>
 {/* CONTACT */}
-<section className="py-20 bg-white">
+<section id="contact" className="py-20 bg-white">
   <div className="max-w-7xl mx-auto px-4 grid md:grid-cols-2 gap-12">
     <div>
       <h2 className="text-5xl font-black">
@@ -761,6 +1331,74 @@ export default function FarmFreshDairyWebsite() {
             Terms & Conditions
         </a>
         </div>
+        {/* LOGIN MODAL */}
+
+{showLogin && (
+
+  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
+
+    <div className="bg-white rounded-3xl p-10 w-full max-w-md">
+
+      <h2 className="text-4xl font-black text-center text-green-700">
+        Customer Login
+      </h2>
+
+      <p className="text-center text-gray-500 mt-3">
+        Login with mobile OTP
+      </p>
+
+      <input
+        type="text"
+        placeholder="Enter Mobile Number"
+        value={phone}
+        onChange={(e) =>
+          setPhone(e.target.value)
+        }
+        className="w-full border rounded-2xl px-5 py-4 mt-8"
+      />
+
+      <button
+        onClick={sendOtp}
+        className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-bold mt-5"
+      >
+        Send OTP
+      </button>
+
+      <input
+        type="text"
+        placeholder="Enter OTP"
+        value={otp}
+        onChange={(e) =>
+          setOtp(e.target.value)
+        }
+        className="w-full border rounded-2xl px-5 py-4 mt-5"
+      />
+      <div
+        id="recaptcha-container"
+        className="mt-5"
+        ></div>
+
+      <button
+        onClick={verifyOtp}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold mt-5"
+      >
+        Verify OTP
+      </button>
+
+      <button
+        onClick={() =>
+          setShowLogin(false)
+        }
+        className="w-full mt-4 text-gray-500 font-bold"
+      >
+        Close
+      </button>
+
+    </div>
+
+  </div>
+
+)}
     </div>
     
   );
