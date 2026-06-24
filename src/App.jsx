@@ -16,6 +16,7 @@ import OrderHistory from "./Pages/OrderHistory";
 
 import ProtectedRoute from "./Components/ProtectedRoute";
 import Navbar from "./Components/Navbar";
+import MobileBottomNav from "./Components/MobileBottomNav";
 
 // Admin
 import AdminProducts from "./Pages/AdminProducts";
@@ -32,127 +33,133 @@ import DeliveryProtectedRoute from "./Components/DeliveryProtectedRoute";
 
 export default function App() {
   return (
-    <div>
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <Routes>
-        {/* Public */}
-        <Route path="/" element={<FarmFreshDairyWebsite />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/admin-login" element={<AdminLogin />} />
-        <Route path="/delivery-login" element={<DeliveryLogin />} />
+      {/* bottom padding for mobile bottom nav */}
+      <div className="pb-20 lg:pb-0">
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<FarmFreshDairyWebsite />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/delivery-login" element={<DeliveryLogin />} />
 
-        {/* Customer public shopping */}
-        <Route path="/products" element={<Products />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/subscription" element={<Subscription />} />
-        <Route
-          path="/subscription-checkout"
-          element={<SubscriptionCheckout />}
-        />
+          {/* Customer public shopping */}
+          <Route path="/products" element={<Products />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/subscription" element={<Subscription />} />
+          <Route
+            path="/subscription-checkout"
+            element={<SubscriptionCheckout />}
+          />
 
-        {/* Customer protected */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <CustomerDashboard />
-            </ProtectedRoute>
-          }
-        />
+          {/* Customer protected */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <CustomerDashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/track-order"
-          element={
-            <ProtectedRoute>
-              <TrackOrder />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/track-order"
+            element={
+              <ProtectedRoute>
+                <TrackOrder />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/order-history"
-          element={
-            <ProtectedRoute>
-              <OrderHistory />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+            path="/order-history"
+            element={
+              <ProtectedRoute>
+                <OrderHistory />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Admin protected */}
-        <Route
-          path="/admin"
-          element={
-            <AdminProtectedRoute>
-              <AdminDashboard />
-            </AdminProtectedRoute>
-          }
-        />
+          {/* Admin protected */}
+          <Route
+            path="/admin"
+            element={
+              <AdminProtectedRoute>
+                <AdminDashboard />
+              </AdminProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin-products"
-          element={
-            <AdminProtectedRoute>
-              <AdminProducts />
-            </AdminProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin-products"
+            element={
+              <AdminProtectedRoute>
+                <AdminProducts />
+              </AdminProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin-customers"
-          element={
-            <AdminProtectedRoute>
-              <AdminCustomers />
-            </AdminProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin-customers"
+            element={
+              <AdminProtectedRoute>
+                <AdminCustomers />
+              </AdminProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin-billing"
-          element={
-            <AdminProtectedRoute>
-              <AdminBilling />
-            </AdminProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin-billing"
+            element={
+              <AdminProtectedRoute>
+                <AdminBilling />
+              </AdminProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/admin/subscriptions"
-          element={
-            <AdminProtectedRoute>
-              <AdminSubscriptions />
-            </AdminProtectedRoute>
-          }
-        />
+          <Route
+            path="/admin/subscriptions"
+            element={
+              <AdminProtectedRoute>
+                <AdminSubscriptions />
+              </AdminProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/delivery-management"
-          element={
-            <AdminProtectedRoute>
-              <DeliveryManagement />
-            </AdminProtectedRoute>
-          }
-        />
+          <Route
+            path="/delivery-management"
+            element={
+              <AdminProtectedRoute>
+                <DeliveryManagement />
+              </AdminProtectedRoute>
+            }
+          />
 
-        {/* Delivery protected */}
-        <Route
-          path="/delivery-boy"
-          element={
-            <DeliveryProtectedRoute>
-              <DeliveryBoy />
-            </DeliveryProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin-delivery-report"
-          element={
-            <AdminProtectedRoute>
-              <AdminDeliveryReport />
-            </AdminProtectedRoute>
-          }
-        />
-      </Routes>
+          <Route
+            path="/admin-delivery-report"
+            element={
+              <AdminProtectedRoute>
+                <AdminDeliveryReport />
+              </AdminProtectedRoute>
+            }
+          />
+
+          {/* Delivery protected */}
+          <Route
+            path="/delivery-boy"
+            element={
+              <DeliveryProtectedRoute>
+                <DeliveryBoy />
+              </DeliveryProtectedRoute>
+            }
+          />
+        </Routes>
+      </div>
+
+      <MobileBottomNav />
     </div>
   );
 }

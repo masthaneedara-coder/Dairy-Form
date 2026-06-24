@@ -2,187 +2,182 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Cart() {
+  const navigate = useNavigate();
 
-  const navigate =  useNavigate();
+  const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
+  const initialCart = Array.isArray(savedCart) ? savedCart : [];
 
-  const [cart, setCart] =
-    useState(
-      JSON.parse(
-        localStorage.getItem(
-          "cart"
-        )
-      ) || []
-    );
+  const [cart, setCart] = useState(initialCart);
 
-  const updateCart =
-    (newCart) => {
-
-      setCart(newCart);
-
-      localStorage.setItem(
-        "cart",
-        JSON.stringify(newCart)
-      );
-
-    };
+  const updateCart = (newCart) => {
+    setCart(newCart);
+    localStorage.setItem("cart", JSON.stringify(newCart));
+  };
 
   const total = cart.reduce(
-  (sum, item) => sum + item.price * item.qty,
-  0
-);
+    (sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0),
+    0
+  );
 
-const totalItems = cart.reduce(
-  (sum, item) => sum + item.qty,
-  0
-);
+  const totalItems = cart.reduce(
+    (sum, item) => sum + Number(item.qty || 0),
+    0
+  );
 
   return (
+    <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+      <div className="max-w-7xl mx-auto">
+        {/* PAGE TITLE */}
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-green-700">
+            🛒 Shopping Cart
+          </h1>
+          <p className="text-gray-500 mt-2 text-sm sm:text-base">
+            Review your selected dairy products
+          </p>
+        </div>
 
-   <div className="max-w-7xl mx-auto p-6">
-  <h1 className="text-4xl font-bold text-center text-green-700 mb-8">
-    Shopping Cart
-  </h1>
-
-  <div className="grid lg:grid-cols-3 gap-6">
-
-    {/* Cart Items */}
-    <div className="lg:col-span-2 space-y-4">
-        {cart.length === 0 && (
-            <div className="bg-white p-10 rounded-2xl text-center shadow">
+        <div className="grid lg:grid-cols-3 gap-5 sm:gap-6">
+          {/* CART ITEMS */}
+          <div className="lg:col-span-2 space-y-4">
+            {cart.length === 0 && (
+              <div className="bg-white p-8 sm:p-10 rounded-3xl text-center shadow-lg">
+                <div className="text-6xl mb-4">🛒</div>
                 <h2 className="text-2xl font-bold text-gray-600">
-                Your Cart Is Empty
+                  Your Cart Is Empty
                 </h2>
 
                 <button
-                onClick={() => navigate("/products")}
-                className="mt-4 bg-green-600 text-white px-6 py-3 rounded-xl"
+                  onClick={() => navigate("/products")}
+                  className="mt-5 bg-green-600 text-white px-6 py-3 rounded-xl font-bold"
                 >
-                Continue Shopping
+                  Continue Shopping
                 </button>
-            </div>
+              </div>
             )}
 
-      {cart.length > 0 &&
-  cart.map((item, index) => (
+            {cart.length > 0 &&
+              cart.map((item, index) => (
+                <div
+                  key={index}
+                  className="bg-white rounded-3xl shadow-md p-4 sm:p-5"
+                >
+                  <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+                    <div className="flex gap-4">
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover flex-shrink-0"
+                      />
 
-        <div
-          key={index}
-          className="bg-white rounded-2xl shadow-md p-4 flex items-center justify-between"
-        >
+                      <div className="min-w-0">
+                        <h2 className="font-bold text-lg sm:text-xl break-words">
+                          {item.name}
+                        </h2>
 
-          <div className="flex items-center gap-4">
+                        <p className="text-gray-500 mt-1">
+                          Size: {item.size || "1L"}
+                        </p>
 
-            <img
-              src={item.image}
-              alt={item.name}
-              className="w-24 h-24 rounded-xl object-cover"
-            />
+                        <p className="text-green-600 font-bold text-lg mt-1">
+                          ₹{item.price}
+                        </p>
 
-            <div>
-              <h2 className="font-bold text-xl">
-                {item.name}
-              </h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Total: ₹{Number(item.price || 0) * Number(item.qty || 0)}
+                        </p>
+                      </div>
+                    </div>
 
-              <p className="text-gray-500">
-                {item.size}
-              </p>
+                    {/* Qty + Remove */}
+                    <div className="flex flex-col sm:items-end gap-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            const newCart = [...cart];
+                            if (newCart[index].qty > 1) {
+                              newCart[index].qty -= 1;
+                              updateCart(newCart);
+                            }
+                          }}
+                          className="bg-red-500 text-white w-10 h-10 rounded-full text-xl font-bold"
+                        >
+                          -
+                        </button>
 
-              <p className="text-green-600 font-bold">
-                ₹{item.price}
-              </p>
-            </div>
+                        <span className="font-bold text-lg min-w-[28px] text-center">
+                          {item.qty}
+                        </span>
 
+                        <button
+                          onClick={() => {
+                            const newCart = [...cart];
+                            newCart[index].qty += 1;
+                            updateCart(newCart);
+                          }}
+                          className="bg-green-500 text-white w-10 h-10 rounded-full text-xl font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const newCart = cart.filter((_, i) => i !== index);
+                          updateCart(newCart);
+                        }}
+                        className="bg-red-600 text-white px-4 py-2 rounded-xl font-semibold w-full sm:w-auto"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
           </div>
 
-         <div className="flex items-center gap-3">
+          {/* SUMMARY */}
+          <div className="bg-white rounded-3xl shadow-lg p-5 sm:p-6 h-fit sticky top-24">
+            <h2 className="text-2xl font-bold mb-5 text-green-700">
+              Order Summary
+            </h2>
 
-            <button
-                onClick={() => {
-                const newCart = [...cart];
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span>Items</span>
+                <span className="font-semibold">{totalItems}</span>
+              </div>
 
-                if (newCart[index].qty > 1) {
-                    newCart[index].qty -= 1;
-                    updateCart(newCart);
-                }
-                }}
-                className="bg-red-500 text-white w-8 h-8 rounded-full"
-            >
-                -
-            </button>
+              <div className="flex justify-between">
+                <span>Delivery</span>
+                <span className="text-green-600 font-semibold">Free</span>
+              </div>
 
-            <span className="font-bold text-lg">
-                {item.qty}
-            </span>
+              <hr className="my-3" />
 
-            <button
-                onClick={() => {
-                const newCart = [...cart];
-                newCart[index].qty += 1;
-                updateCart(newCart);
-                }}
-                className="bg-green-500 text-white w-8 h-8 rounded-full"
-            >
-                +
-            </button>
-
-            <button
-                onClick={() => {
-                const newCart = cart.filter(
-                    (_, i) => i !== index
-                );
-                updateCart(newCart);
-                }}
-                className="bg-red-600 text-white px-3 py-2 rounded-lg"
-            >
-                Remove
-            </button>
-
+              <div className="flex justify-between text-2xl font-black text-green-700">
+                <span>Total</span>
+                <span>₹{total}</span>
+              </div>
             </div>
 
+            <button
+              onClick={() => navigate("/checkout")}
+              disabled={cart.length === 0}
+              className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold disabled:bg-gray-400"
+            >
+              Proceed To Checkout
+            </button>
+
+            <button
+              onClick={() => navigate("/products")}
+              className="w-full mt-3 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-2xl font-semibold"
+            >
+              Continue Shopping
+            </button>
+          </div>
         </div>
-
-      ))}
-
+      </div>
     </div>
-
-    {/* Summary */}
-    <div className="bg-white rounded-2xl shadow-lg p-6 h-fit">
-
-      <h2 className="text-2xl font-bold mb-4">
-        Order Summary
-      </h2>
-
-      <div className="flex justify-between mb-3">
-        <span>Items</span>
-        <span>{totalItems}</span>
-      </div>
-
-      <div className="flex justify-between mb-3">
-        <span>Delivery</span>
-        <span className="text-green-600">
-          Free
-        </span>
-      </div>
-
-      <hr className="my-4" />
-
-      <div className="flex justify-between text-xl font-bold">
-        <span>Total</span>
-        <span>₹{total}</span>
-      </div>
-
-      <button
-        onClick={() => navigate("/checkout")}
-        className="w-full mt-6 bg-green-600 text-white py-3 rounded-xl"
-        >
-        Proceed To Checkout
-    </button>
-
-    </div>
-
-  </div>
-</div>
-
   );
-
 }

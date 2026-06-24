@@ -36,8 +36,7 @@ export default function OrderHistory() {
   const totalOrders = orders.length;
 
   const deliveredCount = orders.filter(
-    (o) =>
-      (o.status || "").toLowerCase() === "delivered"
+    (o) => (o.status || "").toLowerCase() === "delivered"
   ).length;
 
   const pendingCount = orders.filter((o) => {
@@ -46,19 +45,15 @@ export default function OrderHistory() {
   }).length;
 
   const assignedCount = orders.filter(
-    (o) =>
-      (o.status || "").toLowerCase() === "assigned"
+    (o) => (o.status || "").toLowerCase() === "assigned"
   ).length;
 
   const outForDeliveryCount = orders.filter(
-    (o) =>
-      (o.status || "").toLowerCase() ===
-      "out for delivery"
+    (o) => (o.status || "").toLowerCase() === "out for delivery"
   ).length;
 
   const formatDate = (dateValue) => {
     if (!dateValue) return "-";
-
     const date = new Date(dateValue);
     if (isNaN(date.getTime())) return dateValue;
 
@@ -72,17 +67,9 @@ export default function OrderHistory() {
   const getStatusClass = (status) => {
     const normalized = (status || "").toLowerCase();
 
-    if (normalized === "delivered") {
-      return "bg-green-500";
-    }
-
-    if (normalized === "out for delivery") {
-      return "bg-blue-500";
-    }
-
-    if (normalized === "assigned") {
-      return "bg-purple-500";
-    }
+    if (normalized === "delivered") return "bg-green-500";
+    if (normalized === "out for delivery") return "bg-blue-500";
+    if (normalized === "assigned") return "bg-purple-500";
 
     return "bg-orange-500";
   };
@@ -93,26 +80,26 @@ export default function OrderHistory() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
       <div className="max-w-7xl mx-auto">
-        {/* PAGE TITLE */}
-        <h1 className="text-5xl font-black text-center text-green-700 mb-10">
+        {/* TITLE */}
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-center text-green-700 mb-6 sm:mb-8">
           📦 My Orders
         </h1>
 
         {/* CUSTOMER CARD */}
-        <div className="bg-white rounded-3xl shadow-lg p-6 mb-8">
+        <div className="bg-white rounded-3xl shadow-lg p-5 sm:p-6 mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-3xl">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center text-2xl sm:text-3xl">
               👤
             </div>
 
-            <div>
-              <h2 className="text-2xl font-bold text-green-700">
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-green-700 break-words">
                 {localStorage.getItem("customerName") || "Customer"}
               </h2>
 
-              <p className="text-gray-500">
+              <p className="text-gray-500 break-all">
                 {localStorage.getItem("customerPhone") || "-"}
               </p>
             </div>
@@ -120,71 +107,71 @@ export default function OrderHistory() {
         </div>
 
         {/* SUMMARY */}
-        <div className="grid md:grid-cols-4 gap-6 mb-10">
-          <div className="bg-green-600 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">Total Orders</p>
-            <h2 className="text-4xl font-black mt-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
+          <div className="bg-green-600 text-white rounded-3xl p-4 sm:p-6 shadow-lg">
+            <p className="text-sm sm:text-lg">Total Orders</p>
+            <h2 className="text-3xl sm:text-4xl font-black mt-2">
               {totalOrders}
             </h2>
           </div>
 
-          <div className="bg-orange-500 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">Pending</p>
-            <h2 className="text-4xl font-black mt-2">
+          <div className="bg-orange-500 text-white rounded-3xl p-4 sm:p-6 shadow-lg">
+            <p className="text-sm sm:text-lg">Pending</p>
+            <h2 className="text-3xl sm:text-4xl font-black mt-2">
               {pendingCount}
             </h2>
           </div>
 
-          <div className="bg-purple-600 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">Assigned</p>
-            <h2 className="text-4xl font-black mt-2">
+          <div className="bg-purple-600 text-white rounded-3xl p-4 sm:p-6 shadow-lg">
+            <p className="text-sm sm:text-lg">Assigned</p>
+            <h2 className="text-3xl sm:text-4xl font-black mt-2">
               {assignedCount}
             </h2>
           </div>
 
-          <div className="bg-blue-600 text-white rounded-3xl p-6 shadow-lg">
-            <p className="text-lg">Out for Delivery</p>
-            <h2 className="text-4xl font-black mt-2">
+          <div className="bg-blue-600 text-white rounded-3xl p-4 sm:p-6 shadow-lg">
+            <p className="text-sm sm:text-lg">Delivery</p>
+            <h2 className="text-3xl sm:text-4xl font-black mt-2">
               {outForDeliveryCount + deliveredCount}
             </h2>
           </div>
         </div>
 
-        {/* LOADING */}
+        {/* CONTENT */}
         {loading ? (
-          <div className="bg-white rounded-3xl shadow-lg p-12 text-center">
+          <div className="bg-white rounded-3xl shadow-lg p-10 text-center">
             <div className="text-6xl mb-4">⏳</div>
             <h2 className="text-2xl font-bold text-gray-600">
               Loading Orders...
             </h2>
           </div>
         ) : orders.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-lg p-12 text-center">
+          <div className="bg-white rounded-3xl shadow-lg p-10 text-center">
             <div className="text-6xl mb-4">📭</div>
             <h2 className="text-2xl font-bold text-gray-600">
               No Orders Found
             </h2>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {orders.map((order, index) => (
               <div
                 key={order.orderId || index}
-                className="bg-white rounded-3xl shadow-lg p-6 hover:shadow-2xl transition"
+                className="bg-white rounded-3xl shadow-lg p-5 hover:shadow-xl transition"
               >
-                <div className="flex justify-between items-start gap-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-green-700">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-xl sm:text-2xl font-bold text-green-700 break-words">
                       🥛 {order.product || "Milk"}
                     </h2>
 
-                    <p className="text-gray-500 mt-1 break-all">
+                    <p className="text-gray-500 mt-1 text-sm break-all">
                       {order.orderId}
                     </p>
                   </div>
 
                   <span
-                    className={`px-4 py-2 rounded-full text-white font-bold whitespace-nowrap ${getStatusClass(
+                    className={`px-3 py-2 rounded-full text-white font-bold text-xs sm:text-sm whitespace-nowrap ${getStatusClass(
                       order.status
                     )}`}
                   >
@@ -192,36 +179,25 @@ export default function OrderHistory() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                  <div>
-                    <p className="text-gray-500 text-sm">
-                      Quantity
-                    </p>
-
-                    <h3 className="font-bold text-lg">
+                <div className="grid grid-cols-2 gap-4 mt-5">
+                  <div className="bg-slate-50 rounded-2xl p-4">
+                    <p className="text-gray-500 text-sm">Quantity</p>
+                    <h3 className="font-bold text-lg sm:text-xl">
                       {order.qty}
                     </h3>
                   </div>
 
-                  <div>
-                    <p className="text-gray-500 text-sm">
-                      Amount
-                    </p>
-
-                    <h3 className="font-bold text-lg text-green-700">
+                  <div className="bg-slate-50 rounded-2xl p-4">
+                    <p className="text-gray-500 text-sm">Amount</p>
+                    <h3 className="font-bold text-lg sm:text-xl text-green-700">
                       ₹{order.amount}
                     </h3>
                   </div>
                 </div>
 
-                <div className="mt-4 border-t pt-4">
-                  <p className="text-sm text-gray-500">
-                    Order Date
-                  </p>
-
-                  <p className="font-semibold">
-                    {formatDate(order.date)}
-                  </p>
+                <div className="mt-5 border-t pt-4">
+                  <p className="text-sm text-gray-500">Order Date</p>
+                  <p className="font-semibold">{formatDate(order.date)}</p>
                 </div>
               </div>
             ))}

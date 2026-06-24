@@ -5,7 +5,6 @@ export default function TrackOrder() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // USE THE SAME APPS SCRIPT URL WHERE YOUR CURRENT Code.gs IS DEPLOYED
   const SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbxrawDo75QKP1RwDwjjAKwoE0-so9UdTG2V4Dpq94PF8KOrMNx4CpfBEuNlk7VvblII/exec";
 
@@ -26,9 +25,7 @@ export default function TrackOrder() {
             )}`
           ),
           fetch(
-            `${SCRIPT_URL}?action=orders&phone=${encodeURIComponent(
-              phone
-            )}`
+            `${SCRIPT_URL}?action=orders&phone=${encodeURIComponent(phone)}`
           ),
         ]);
 
@@ -53,7 +50,7 @@ export default function TrackOrder() {
     if (normalized === "delivered") return 4;
     if (normalized === "out for delivery") return 3;
     if (normalized === "assigned") return 2;
-    return 1; // Pending / empty / any other initial state
+    return 1;
   };
 
   const getStatusStyle = (status) => {
@@ -74,12 +71,24 @@ export default function TrackOrder() {
     return "bg-orange-100 text-orange-700";
   };
 
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "-";
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return dateValue;
+
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="bg-white p-10 rounded-3xl shadow-xl text-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
+        <div className="bg-white p-8 sm:p-10 rounded-3xl shadow-xl text-center max-w-md w-full">
           <div className="text-6xl mb-4">🚚</div>
-          <h2 className="text-3xl font-bold text-gray-700">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-700">
             Loading your deliveries...
           </h2>
         </div>
@@ -89,10 +98,10 @@ export default function TrackOrder() {
 
   if (subscriptions.length === 0 && orders.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="bg-white p-10 rounded-3xl shadow-xl text-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
+        <div className="bg-white p-8 sm:p-10 rounded-3xl shadow-xl text-center max-w-md w-full">
           <div className="text-6xl mb-4">🚚</div>
-          <h2 className="text-3xl font-bold text-gray-600">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-600">
             No Active Deliveries
           </h2>
           <p className="text-gray-500 mt-2">
@@ -104,22 +113,22 @@ export default function TrackOrder() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 py-10 px-4">
+    <div className="min-h-screen bg-slate-100 py-4 sm:py-6 px-3 sm:px-4 md:px-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-5xl font-black text-green-700">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-green-700">
             🚚 Live Order Tracking
           </h1>
-          <p className="text-gray-500 mt-3 text-lg">
+          <p className="text-gray-500 mt-3 text-sm sm:text-lg">
             Track your milk delivery in real time
           </p>
         </div>
 
         {/* Subscription Deliveries */}
-        <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-black text-green-700">
+        <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <h2 className="text-2xl sm:text-3xl font-black text-green-700">
               🥛 Active Subscription Deliveries
             </h2>
 
@@ -133,7 +142,7 @@ export default function TrackOrder() {
               No Active Subscriptions
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {subscriptions.map((sub, index) => {
                 const subStatus =
                   sub.computedStatus || sub.status || "Active";
@@ -141,33 +150,28 @@ export default function TrackOrder() {
                 return (
                   <div
                     key={sub.subscriptionId || index}
-                    className="bg-gradient-to-r from-green-600 to-green-500 text-white rounded-3xl p-6 shadow-lg"
+                    className="bg-gradient-to-r from-green-600 to-green-500 text-white rounded-3xl p-5 sm:p-6 shadow-lg"
                   >
-                    <div className="flex justify-between items-start gap-4">
-                      <div>
-                        <h3 className="text-2xl font-bold">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="min-w-0">
+                        <h3 className="text-xl sm:text-2xl font-bold break-words">
                           🥛 {sub.product || "Milk Subscription"}
                         </h3>
 
-                        <p className="mt-2">
+                        <p className="mt-2 text-sm sm:text-base">
                           Quantity: {sub.qty || "-"}
                         </p>
 
-                        <p>
+                        <p className="text-sm sm:text-base">
                           Delivery: {sub.deliveryType || "Daily"}
                         </p>
 
-                        <p>
-                          Expiry:{" "}
-                          {sub.expireDate
-                            ? new Date(sub.expireDate).toLocaleDateString(
-                                "en-IN"
-                              )
-                            : "-"}
+                        <p className="text-sm sm:text-base">
+                          Expiry: {formatDate(sub.expireDate)}
                         </p>
                       </div>
 
-                      <span className="bg-white text-green-700 px-4 py-2 rounded-full font-bold whitespace-nowrap">
+                      <span className="bg-white text-green-700 px-3 py-2 rounded-full font-bold whitespace-nowrap text-xs sm:text-sm">
                         {subStatus}
                       </span>
                     </div>
@@ -178,11 +182,11 @@ export default function TrackOrder() {
           )}
         </div>
 
-        {/* Today's Orders */}
-        <div className="bg-white rounded-3xl shadow-xl p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-black text-blue-700">
-              🛒 Today&apos;s Orders
+        {/* Orders */}
+        <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <h2 className="text-2xl sm:text-3xl font-black text-blue-700">
+              🛒 Today's Orders
             </h2>
 
             <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-bold">
@@ -195,7 +199,7 @@ export default function TrackOrder() {
               No Orders Found
             </div>
           ) : (
-            <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
               {orders.map((order, index) => {
                 const status = order.status || "Pending";
                 const step = getOrderStep(status);
@@ -207,17 +211,17 @@ export default function TrackOrder() {
                   >
                     {/* Header */}
                     <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-5">
-                      <h3 className="text-2xl font-bold">
+                      <h3 className="text-xl sm:text-2xl font-bold break-words">
                         🥛 {order.product || "Milk"}
                       </h3>
-                      <p className="text-sm mt-1">
+                      <p className="text-xs sm:text-sm mt-1 break-all">
                         Order ID: {order.orderId}
                       </p>
                     </div>
 
                     {/* Body */}
                     <div className="p-5">
-                      <div className="space-y-2 mb-5">
+                      <div className="space-y-2 mb-5 text-sm sm:text-base">
                         <p>
                           <strong>Qty:</strong> {order.qty}
                         </p>
@@ -238,19 +242,18 @@ export default function TrackOrder() {
                         </p>
                       </div>
 
-                      {/* Progress Labels */}
-                      <div className="flex justify-between text-xs font-medium mb-2 text-gray-600">
+                      {/* Progress labels */}
+                      <div className="flex justify-between text-[10px] sm:text-xs font-medium mb-2 text-gray-600">
                         <span>Placed</span>
                         <span>Assigned</span>
                         <span>Delivery</span>
                         <span>Done</span>
                       </div>
 
-                      {/* Progress Bar */}
+                      {/* Progress bar */}
                       <div className="flex items-center">
-                        {/* Step 1 */}
                         <div
-                          className={`w-6 h-6 rounded-full ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full ${
                             step >= 1 ? "bg-green-500" : "bg-gray-300"
                           }`}
                         ></div>
@@ -261,9 +264,8 @@ export default function TrackOrder() {
                           }`}
                         ></div>
 
-                        {/* Step 2 */}
                         <div
-                          className={`w-6 h-6 rounded-full ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full ${
                             step >= 2 ? "bg-green-500" : "bg-gray-300"
                           }`}
                         ></div>
@@ -274,9 +276,8 @@ export default function TrackOrder() {
                           }`}
                         ></div>
 
-                        {/* Step 3 */}
                         <div
-                          className={`w-6 h-6 rounded-full ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full ${
                             step >= 3 ? "bg-green-500" : "bg-gray-300"
                           }`}
                         ></div>
@@ -287,9 +288,8 @@ export default function TrackOrder() {
                           }`}
                         ></div>
 
-                        {/* Step 4 */}
                         <div
-                          className={`w-6 h-6 rounded-full ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full ${
                             step >= 4 ? "bg-green-500" : "bg-gray-300"
                           }`}
                         ></div>
