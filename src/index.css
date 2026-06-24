@@ -7,6 +7,64 @@
 html {
   scroll-behavior: smooth;
 }
+.leaf {
+  position: absolute;
+  top: -40px;
+  font-size: 34px;
+  opacity: 0.55;
+  pointer-events: none;
+  animation: fall linear infinite;
+  filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.35));
+}
+
+.leaf-1 {
+  left: 8%;
+  animation-duration: 8s;
+  animation-delay: 0s;
+}
+
+.leaf-2 {
+  left: 24%;
+  animation-duration: 10s;
+  animation-delay: 1.5s;
+}
+
+.leaf-3 {
+  left: 46%;
+  animation-duration: 7s;
+  animation-delay: 0.8s;
+}
+
+.leaf-4 {
+  left: 68%;
+  animation-duration: 9s;
+  animation-delay: 2s;
+}
+
+.leaf-5 {
+  left: 86%;
+  animation-duration: 11s;
+  animation-delay: 1s;
+}
+
+@keyframes fall {
+  0% {
+    transform: translateY(-20px) rotate(0deg) scale(0.9);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(120px) translateX(14px) rotate(120deg) scale(1);
+    opacity: 0.65;
+  }
+  100% {
+    transform: translateY(260px) translateX(-14px) rotate(240deg) scale(0.95);
+    opacity: 0;
+  }
+}
+
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -86,4 +144,18 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 15s linear infinite;
 }

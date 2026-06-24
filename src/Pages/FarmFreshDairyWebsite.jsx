@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
 import heroImage from "../assets/logo3.png";
 import { auth } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 import {
   RecaptchaVerifier,
@@ -10,6 +11,7 @@ import {
 
 
 export default function FarmFreshDairyWebsite() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [quantity, setQuantity] =
   useState({});
@@ -33,6 +35,7 @@ export default function FarmFreshDairyWebsite() {
     ],
   },
 ]);
+const [cart, setCart] = useState([]);
 
 const [walletBalance, setWalletBalance] =
   useState(1250);
@@ -44,18 +47,33 @@ const monthlyBill = subscriptions.reduce(
 );  
 
   const SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbwDo-NO1_Ul5WQNUvsUowPQG2rgebzgX47SGyfJFTa5m6vdKqk01TAdc6KC9rhZs_yD/exec";
+    "https://script.google.com/macros/s/AKfycbxrawDo75QKP1RwDwjjAKwoE0-so9UdTG2V4Dpq94PF8KOrMNx4CpfBEuNlk7VvblII/exec";
 
-  useEffect(() => {
-    fetch(SCRIPT_URL)
-      .then((res) => res.json())
-      .then((data) => {
+ useEffect(() => {
+  const loadProducts = async () => {
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=products`);
+      const data = await res.json();
+
+      console.log("Products API response:", data);
+
+      if (Array.isArray(data)) {
         setProducts(data);
-      })
-      .catch((err) => {
-        console.log(err);
-      });
-  }, []);
+      } else if (Array.isArray(data.products)) {
+        setProducts(data.products);
+      } else if (Array.isArray(data.data)) {
+        setProducts(data.data);
+      } else {
+        setProducts([]);
+      }
+    } catch (err) {
+      console.log("Products fetch error:", err);
+      setProducts([]);
+    }
+  };
+
+  loadProducts();
+}, []);
   useEffect(() => {
 
   const hash =
@@ -313,19 +331,19 @@ const addSubscription = (product) => {
   {
     title: "Starter Plan",
     qty: "500ml Daily",
-    price: 900,
+    price: 1199,
   },
 
   {
     title: "Family Plan",
     qty: "1L Daily",
-    price: 1800,
+    price: 2699,
   },
 
   {
     title: "Premium Plan",
     qty: "2L Daily",
-    price: 3500,
+    price: 5399,
   },
 
 ];
@@ -624,13 +642,57 @@ const handleLogin = () => {
 
   return (   
     
-    
-    <div className="min-h-screen bg-white text-gray-800">
-      {/* HEADER */}
-      
+<div className="min-h-screen bg-white text-gray-800">
+  
+          {/* HERO */}
+    {/* HEADER */}
+<header className="sticky top-0 z-50 bg-white shadow-md">
 
-      {/* HERO */}
-      <section className="relative overflow-hidden">
+  {/* TOP BAR */}
+  {/* <div className="bg-gray-50 border-b">
+    <div className="max-w-7xl mx-auto px-6 py-2 flex justify-end">
+
+      {isLoggedIn ? (
+        <div className="flex items-center gap-3">
+
+          <span className="font-semibold text-green-700">
+            👋 {customerName}
+          </span>
+
+          <button
+            onClick={() => {
+              localStorage.removeItem("customerLogin");
+              localStorage.removeItem("customerName");
+              localStorage.removeItem("customerPhone");
+
+              setIsLoggedIn(false);
+
+              navigate("/");
+            }}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+          >
+            Logout
+          </button>
+
+        </div>
+      ) : (
+        <button
+          onClick={() => navigate("/auth")}
+          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg"
+        >
+          Login
+        </button>
+      )}
+
+    </div>
+  </div> */}
+
+  {/* MAIN HEADER */}
+ 
+</header>
+  {/* FEATURES */}
+      {/* SMART FEATURES SECTION */}
+        <section className="relative overflow-hidden">
   <div
     className="absolute inset-0 bg-cover bg-center"
     style={{
@@ -694,197 +756,11 @@ const handleLogin = () => {
     </div>
   </div>
 </section>   
-  {/* FEATURES */}
-      {/* SMART FEATURES SECTION */}
 
-<section className="py-24 bg-gradient-to-b from-green-50 to-white">
-
-  <div className="max-w-7xl mx-auto px-6">
-
-    {/* HEADING */}
-
-    <div className="text-center mb-16">
-
-      <h2 className="text-5xl font-black text-green-700">
-        Smart Dairy Features
-      </h2>
-
-      <p className="mt-5 text-xl text-gray-600">
-        Advanced milk delivery platform with
-        smart technology and automation.
-      </p>
-
-    </div>
-
-    {/* FEATURE GRID */}
-
-    <div className="grid md:grid-cols-3 gap-10">
-
-      {/* CARD 1 */}
-
-      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-green-100">
-
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-4xl text-white shadow-lg">
-          📱
-        </div>
-
-        <h3 className="text-3xl font-black mt-8 text-gray-800">
-          Android & iOS Apps
-        </h3>
-
-        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
-          Order fresh milk directly from
-          mobile apps with live tracking.
-        </p>
-
-      </div>
-
-      {/* CARD 2 */}
-
-<div
-  onClick={() => {
-    document
-      .getElementById("subscriptions")
-      .scrollIntoView({
-        behavior: "smooth",
-      });
-  }}
-  className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-blue-100 cursor-pointer"
->
-
-  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-4xl text-white shadow-lg">
-    🔄
-  </div>
-
-  <h3 className="text-3xl font-black mt-8 text-gray-800">
-    Subscription Delivery
-  </h3>
-
-  <p className="text-gray-600 mt-4 text-lg leading-relaxed">
-    Daily automatic milk delivery
-    with flexible subscription plans.
-  </p>
-
-  <div className="mt-8 space-y-4">
-
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
-        ✓
-      </div>
-
-      <span className="text-gray-700 font-semibold">
-        Auto Daily Delivery
-      </span>
-    </div>
-
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
-        ✓
-      </div>
-
-      <span className="text-gray-700 font-semibold">
-        Pause & Resume Anytime
-      </span>
-    </div>
-
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
-        ✓
-      </div>
-
-      <span className="text-gray-700 font-semibold">
-        Flexible Quantity Change
-      </span>
-    </div>
-
-  </div>
-
-</div>
-
-      {/* CARD 3 */}
-
-      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-purple-100">
-
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-4xl text-white shadow-lg">
-          💳
-        </div>
-
-        <h3 className="text-3xl font-black mt-8 text-gray-800">
-          Wallet & Payments
-        </h3>
-
-        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
-          Recharge wallet and make
-          secure online payments instantly.
-        </p>
-
-      </div>
-
-      {/* CARD 4 */}
-
-      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-yellow-100">
-
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-4xl text-white shadow-lg">
-          🚚
-        </div>
-
-        <h3 className="text-3xl font-black mt-8 text-gray-800">
-          Delivery Time Slots
-        </h3>
-
-        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
-          Choose morning or evening
-          delivery according to your schedule.
-        </p>
-
-      </div>
-
-      {/* CARD 5 */}
-
-      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-pink-100">
-
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-400 to-red-500 flex items-center justify-center text-4xl text-white shadow-lg">
-          🎟️
-        </div>
-
-        <h3 className="text-3xl font-black mt-8 text-gray-800">
-          Discount Coupons
-        </h3>
-
-        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
-          Save more using subscription
-          offers and discount coupons.
-        </p>
-
-      </div>
-
-      {/* CARD 6 */}
-
-      <div className="group bg-white rounded-[35px] p-10 shadow-lg hover:shadow-2xl transition duration-500 hover:-translate-y-3 border border-orange-100">
-
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-4xl text-white shadow-lg">
-          🔔
-        </div>
-
-        <h3 className="text-3xl font-black mt-8 text-gray-800">
-          Order Reminders
-        </h3>
-
-        <p className="text-gray-600 mt-4 text-lg leading-relaxed">
-          Get smart notifications and
-          reminders for daily delivery.
-        </p>
-
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
+ 
       {/* PRODUCTS */}
       <section id="products" className="py-20">
+        
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-14">
             <h2 className="text-5xl font-black">
@@ -897,7 +773,7 @@ const handleLogin = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-10">
-            {products.map((product, index) => (
+            {(Array.isArray(products) ? products : []).map((product, index) => (
               <div
                 key={index}
                 className="bg-white rounded-3xl overflow-hidden shadow-2xl"
@@ -937,50 +813,78 @@ const handleLogin = () => {
                         }
                         className="w-full border rounded-2xl px-5 py-4 mt-6"
                       />
+                      <button
+                        onClick={() => {
 
-                 <button
-                    onClick={() => {
+                          const isLoggedIn =
+                            localStorage.getItem("customerLogin") === "true";
 
-                      const isLoggedIn =
-                        localStorage.getItem(
-                          "customerLogin"
-                        ) === "true";
+                          const qty =
+                            quantity[product.name];
 
-                      if (!isLoggedIn) {
+                          if (!qty || qty <= 0) {
 
-                        setShowLogin(true);
+                            alert("Please enter quantity");
 
-                        return;
+                            return;
 
-                      }
+                          }
 
-                      const qty =
-                        quantity[product.name];
+                          const cartItem = {
+                            name: product.name,
+                            price: product.price,
+                            image: product.image,
+                            qty: Number(qty),
+                          };
 
-                      if (!qty || qty <= 0) {
+                          // Login Check
+                          if (!isLoggedIn) {
 
-                        alert(
-                          "Please enter quantity"
-                        );
+                            localStorage.setItem(
+                              "pendingCartItem",
+                              JSON.stringify(cartItem)
+                            );
 
-                        return;
+                            navigate("/auth");
 
-                      }
+                            return;
 
-                      const totalPrice =
-                        Number(product.price) *
-                        Number(qty);
+                          }
 
-                      window.location.href =
-                        `/subscribe?product=${encodeURIComponent(product.name)}&qty=${qty}&price=${totalPrice}`;
+                          const cart =
+                            JSON.parse(
+                              localStorage.getItem("cart") || "[]"
+                            );
 
-                    }}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-bold mt-6"
-                  >
+                          const existingItem =
+                            cart.find(
+                              item => item.name === product.name
+                            );
 
-                    Order Now
+                          if (existingItem) {
 
-                  </button>
+                            existingItem.qty += Number(qty);
+
+                          } else {
+
+                            cart.push(cartItem);
+
+                          }
+
+                          localStorage.setItem(
+                            "cart",
+                            JSON.stringify(cart)
+                          );
+
+                          navigate("/cart");
+
+                        }}
+                        className="w-full mt-6 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg transition-all duration-300 hover:scale-105"
+                      >
+                        🛒 Order Now
+                      </button>
+
+               
                 </div>
               </div>
             ))}
@@ -1022,10 +926,23 @@ const handleLogin = () => {
                   ₹{plan.price} / Month
                 </div>
 
-                <button
-                  onClick={() =>
-                    handlePayment(plan.price)
-                  }
+               <button
+                  onClick={() => {
+
+                    const isLoggedIn =
+                      localStorage.getItem("customerLogin") === "true";
+
+                    if (!isLoggedIn) {
+
+                      navigate("/auth");
+
+                      return;
+
+                    }
+
+                    handlePayment(plan.price);
+
+                  }}
                   className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-2xl font-bold"
                 >
                   Choose Plan
@@ -1054,6 +971,7 @@ const handleLogin = () => {
 
         </div>
         </div>
+        
 
       {/* TITLE */}
       <h2 className="text-6xl font-black mt-10 text-green-800 leading-tight">

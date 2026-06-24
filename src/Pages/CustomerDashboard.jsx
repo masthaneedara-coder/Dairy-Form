@@ -1,937 +1,531 @@
 import { useEffect, useState } from "react";
-
-import { db } from "../firebase";
-
-
-import {
-  collection,
-  getDocs,
-} from "firebase/firestore";
-
+import { useNavigate } from "react-router-dom";
 
 export default function CustomerDashboard() {
-    
+  const navigate = useNavigate();
 
-    const subscriptionProducts = [
-
-  {
-    name: "Cow Milk",
-    price: 60,
-  },
-
-  {
-    name: "Buffalo Milk",
-    price: 80,
-  },
-
-  {
-    name: "Fresh Curd",
-    price: 120,
-  },
-
-  {
-    name: "Paneer",
-    price: 350,
-  },
-
-];
-const [orderHistory] = useState([
-  {
-    id: 1,
-    product: "Buffalo Milk",
-    qty: 2,
-    amount: 160,
-    status: "Delivered",
-    date: "12 May 2026",
-  },
-
-  {
-    id: 2,
-    product: "Cow Milk",
-    qty: 1,
-    amount: 60,
-    status: "Delivered",
-    date: "11 May 2026",
-  },
-
-  {
-    id: 3,
-    product: "Fresh Curd",
-    qty: 1,
-    amount: 120,
-    status: "Processing",
-    date: "10 May 2026",
-  },
-]);
-const subscriptions = [
-
-  {
-    product: "Cow Milk",
-    quantity: "2 Liters",
-    status: "Active",
-  },
-
-  {
-    product: "Buffalo Milk",
-    quantity: "1 Liter",
-    status: "Paused",
-  },
-
-];
-const upcomingDays = [
-
-  {
-    day: "Monday",
-    status: "Milk Delivery",
-  },
-
-  {
-    day: "Tuesday",
-    status: "Milk Delivery",
-  },
-
-  {
-    day: "Wednesday",
-    status: "Paused",
-  },
-
-  {
-    day: "Thursday",
-    status: "Milk Delivery",
-  },
-
-];
-const [notifications, setNotifications] =
-  useState([
-    {
-      id: 1,
-      title: "Milk Delivered",
-      message:
-        "Your Buffalo Milk was delivered successfully.",
-      type: "success",
-    },
-
-    {
-      id: 2,
-      title: "Wallet Low",
-      message:
-        "Recharge wallet to continue delivery.",
-      type: "warning",
-    },
-
-    {
-      id: 3,
-      title: "Subscription Active",
-      message:
-        "Your Family Plan is active.",
-      type: "info",
-    },
-  ]);
-  const deliverySteps = [
-  "Preparing",
-  "Out For Delivery",
-  "Reached Nearby",
-  "Delivered",
-];
-  const [deliveryStatus, setDeliveryStatus] =
-    useState("Preparing");
-const monthlyBill = 2450;
-const [walletBalance,
-  setWalletBalance] =
-  useState(500);
-
-  const [orders, setOrders] =
-    useState([]);
+  const customerName =
+    localStorage.getItem("customerName") || "Customer";
 
   const customerPhone =
-    localStorage.getItem(
-      "customerPhone"
+    localStorage.getItem("customerPhone") || "";
+
+  const SCRIPT_URL =
+    "https://script.google.com/macros/s/AKfycbxrawDo75QKP1RwDwjjAKwoE0-so9UdTG2V4Dpq94PF8KOrMNx4CpfBEuNlk7VvblII/exec";
+
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [deliveryOrders, setDeliveryOrders] = useState([]);
+  const [bills, setBills] = useState([]);
+
+  // =========================
+  // HELPERS
+  // =========================
+  const formatDate = (date) => {
+    if (!date) return "-";
+
+    const d = new Date(date);
+    if (isNaN(d)) return "-";
+
+    return d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getRemainingDays = (expireDate) => {
+    if (!expireDate) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiry = new Date(expireDate);
+    if (isNaN(expiry)) return 0;
+
+    expiry.setHours(0, 0, 0, 0);
+
+    const diff = Math.ceil(
+      (expiry - today) / (1000 * 60 * 60 * 24)
     );
-    
+
+    return diff > 0 ? diff : 0;
+  };
+
+  const getSubscriptionStatus = (sub) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (sub.status === "Paused") {
+      return "Paused";
+    }
+
+    const expiry = new Date(sub.expireDate);
+
+    if (!isNaN(expiry)) {
+      expiry.setHours(0, 0, 0, 0);
+
+      if (expiry < today) {
+        return "Expired";
+      }
+    }
+
+    return "Active";
+  };
+
+  const subscriptionsWithStatus = subscriptions.map((sub) => {
+    const remainingDays = getRemainingDays(sub.expireDate);
+    const computedStatus = getSubscriptionStatus(sub);
+
+    return {
+      ...sub,
+      remainingDays,
+      computedStatus,
+      isExpired: computedStatus === "Expired",
+    };
+  });
+
+  // =========================
+  // LOAD DATA
+  // =========================
+  const loadSubscriptions = async () => {
+    try {
+      const res = await fetch(
+        `${SCRIPT_URL}?action=subscriptions&phone=${customerPhone}`
+      );
+      const data = await res.json();
+      setSubscriptions(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load subscriptions:", error);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      const ordersRes = await fetch(
+        `${SCRIPT_URL}?action=orders&phone=${customerPhone}`
+      );
+      const ordersData = await ordersRes.json();
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+
+      const deliveryRes = await fetch(
+        `${SCRIPT_URL}?action=deliveryStatus&phone=${customerPhone}`
+      );
+      const deliveryData = await deliveryRes.json();
+      setDeliveryOrders(
+        Array.isArray(deliveryData) ? deliveryData : []
+      );
+
+      const billsRes = await fetch(
+        `${SCRIPT_URL}?action=customerBills&phone=${customerPhone}`
+      );
+      const billsData = await billsRes.json();
+      setBills(Array.isArray(billsData) ? billsData : []);
+    } catch (error) {
+      console.error("Failed to load orders:", error);
+    }
+  };
 
   useEffect(() => {
+    loadSubscriptions();
+    loadOrders();
 
-    const fetchOrders =
-      async () => {
+    const interval = setInterval(() => {
+      loadOrders();
+      loadSubscriptions();
+    }, 10000);
 
-      try {
-
-        const querySnapshot =
-          await getDocs(
-            collection(db, "orders")
-          );
-
-        const customerOrders = [];
-
-        querySnapshot.forEach((doc) => {
-
-          const data =
-            doc.data();
-
-          if (
-            data.mobile ===
-            customerPhone
-          ) {
-
-            customerOrders.push({
-              id: doc.id,
-              ...data,
-            });
-
-          }
-
-        });
-
-        setOrders(
-          customerOrders
-        );
-
-      } catch (error) {
-
-        console.log(error);
-
-      }
-
-    };
-
-    fetchOrders();
-
+    return () => clearInterval(interval);
   }, []);
 
-  const totalSpent =
-    orders.reduce(
-      (total, item) =>
-        total + Number(item.amount),
-      0
-    );
-    const handleLogout = () => {
+  // =========================
+  // UPDATE SUBSCRIPTION
+  // =========================
+  const updateSubscription = async (subscriptionId, status) => {
+  try {
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+      body: JSON.stringify({
+        action: "updateSubscriptionStatus",
+        subscriptionId,
+        status,
+      }),
+    });
 
-  localStorage.removeItem(
-    "customerLogin"
-  );
+    const result = await res.json();
 
-  localStorage.removeItem(
-    "customerName"
-  );
+    if (result.success) {
+      alert(
+        status === "Active"
+          ? "Subscription resumed successfully"
+          : "Subscription paused successfully"
+      );
 
-  localStorage.removeItem(
-    "customerPhone"
-  );
-
-  window.location.href =
-    "/auth";
-
+      await loadSubscriptions();
+    } else {
+      alert(result.message || "Failed to update subscription");
+    }
+  } catch (err) {
+    console.error("Update subscription error:", err);
+    alert("Failed to update subscription");
+  }
 };
 
+  // =========================
+  // SUMMARY CARDS
+  // =========================
+ 
+
+  const activePlans = subscriptionsWithStatus.filter(
+    (s) => s.computedStatus === "Active"
+  ).length;
+
   return (
-
-    <div className="min-h-screen bg-gray-100 p-10">
-
-      <h1 className="text-5xl font-black text-green-700 text-center">
-        Customer Dashboard
-      </h1>
-    <div className="flex items-start justify-between mb-10 ">
-
-  <div >    
-
-    <p className="text-gray-500 mt-3 text-xl" >
-
-      Welcome,
-      {" "}
-      {localStorage.getItem(
-        "customerName"
-      )}
-
-    </p>
-
-  </div>
-
-  <button
-    onClick={handleLogout}
-    className="bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-2xl font-bold"
-  >
-
-    Logout
-
-  </button>
-
-</div>
-
-{/* ACTION BUTTONS */}
-
-<div className="flex flex-wrap gap-5 mt-10">
-
-  <button
-  onClick={() => {
-
-            window.location.href =
-            "/#products";
-
-        }}
-        className="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-2xl font-bold"
-        >
-
-        🥛 Order Milk
-
-    </button>
-
-  <button
-        onClick={() => {
-
-            window.location.href =
-            "/#subscriptions";
-
-        }}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-bold"
-        >
-
-        📦 Subscription Plans
-
-   </button>
-
-  <button
-    onClick={() => {
-      window.location.href =
-        "/track-order";
-    }}
-    className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-2xl font-bold"
-  >
-
-    🚚 Track Orders
-
-  </button>
-
-</div>
-<section id="subscriptions" className="py-20 bg-gray-50">
-
-  <div className="max-w-6xl mx-auto px-6">
-
-    <h2 className="text-5xl font-black text-center text-green-700">
-      My Subscriptions
-    </h2>
-    <div className="mt-10 flex flex-wrap gap-4 justify-center">
-
-            {subscriptionProducts.map((product) => (
-
-                <button
-                key={product.name}
-                onClick={() => addSubscription(product)}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-2xl font-bold shadow-lg"
-                >
-                + Add {product.name}
-                </button>
-
-            ))}
-
-            </div>
-    <div className="grid md:grid-cols-3 gap-6 mb-12">
-
-  <div className="bg-white rounded-3xl p-8 shadow-lg">
-
-  <h3 className="text-2xl font-black text-gray-700">
-    Wallet Balance
-  </h3>
-
-  <p className="text-5xl font-black text-green-600 mt-4">
-    ₹{walletBalance}
-  </p>
-
-  {/* RECHARGE BUTTONS */}
-
-  <div className="mt-8 flex flex-wrap gap-3">
-
-    <button
-      onClick={() => rechargeWallet(500)}
-      className="bg-green-600 text-white px-5 py-3 rounded-2xl font-bold"
-    >
-      + ₹500
-    </button>
-
-    <button
-      onClick={() => rechargeWallet(1000)}
-      className="bg-blue-600 text-white px-5 py-3 rounded-2xl font-bold"
-    >
-      + ₹1000
-    </button>
-
-    <button
-      onClick={() => rechargeWallet(2000)}
-      className="bg-purple-600 text-white px-5 py-3 rounded-2xl font-bold"
-    >
-      + ₹2000
-    </button>
-
-  </div>
-
-</div>
-
-  <div className="bg-white rounded-3xl p-8 shadow-lg">
-    <h3 className="text-2xl font-black text-gray-700">
-      Monthly Bill
-    </h3>
-
-    <p className="text-5xl font-black text-blue-600 mt-4">
-      ₹{monthlyBill}
-    </p>
-  </div>
-
-  <div className="bg-white rounded-3xl p-8 shadow-lg">
-    <h3 className="text-2xl font-black text-gray-700">
-      Active Plans
-    </h3>
-
-    <p className="text-5xl font-black text-orange-500 mt-4">
-      {subscriptions.length}
-    </p>
-  </div>
-
-</div>
-{/* DELIVERY CALENDAR */}
-
-<div className="bg-white rounded-3xl p-8 shadow-lg mb-10">
-
-  <div className="flex items-center justify-between flex-wrap gap-4">
-
-    <div>
-
-      <h3 className="text-3xl font-black text-gray-800">
-        Delivery Calendar
-      </h3>
-
-      <p className="text-gray-500 mt-2">
-        Upcoming milk delivery schedule
-      </p>
-
-    </div>
-
-    <div className="bg-green-100 text-green-700 px-5 py-3 rounded-full font-bold">
-      Active Deliveries
-    </div>
-
-  </div>
-
-  {/* DAYS */}
-
-  <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mt-10">
-
-    {upcomingDays.map((item, index) => (
-
-      <div
-        key={index}
-        className="rounded-3xl border border-green-100 p-5 text-center bg-green-50"
-      >
-
-        <div className="text-gray-500 font-semibold">
-          {item.day}
+    <div className="min-h-screen bg-slate-50 px-6 py-6">
+      {/* HERO */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 rounded-3xl shadow-2xl p-8 mb-8">
+        <div className="absolute top-0 right-0 opacity-10 text-[200px]">
+          🥛
         </div>
 
-        <div className="text-4xl font-black text-green-700 mt-3">
-          {item.date}
-        </div>
-
-        <div className="mt-4 text-sm font-bold text-green-600">
-          Delivery
-        </div>
-
-      </div>
-
-    ))}
-
-  </div>
-
-</div>
-{/* NOTIFICATIONS */}
-
-<div className="bg-white rounded-3xl p-8 shadow-lg mb-10">
-
-  <div className="flex items-center justify-between flex-wrap gap-4">
-
-    <div>
-
-      <h3 className="text-3xl font-black text-gray-800">
-        Notifications
-      </h3>
-
-      <p className="text-gray-500 mt-2">
-        Recent updates and alerts
-      </p>
-
-    </div>
-
-    <div className="bg-orange-100 text-orange-700 px-5 py-3 rounded-full font-bold">
-      {notifications.length} Alerts
-    </div>
-
-  </div>
-
-  {/* LIST */}
-
-  <div className="mt-10 space-y-5">
-
-    {notifications.map((note) => (
-
-      <div
-        key={note.id}
-        className={`rounded-3xl p-6 flex items-start gap-5 border ${
-          note.type === "success"
-            ? "bg-green-50 border-green-100"
-            : note.type === "warning"
-            ? "bg-yellow-50 border-yellow-100"
-            : "bg-blue-50 border-blue-100"
-        }`}
-      >
-
-        {/* ICON */}
-
-        <div className="text-4xl">
-
-          {note.type === "success"
-            ? "✅"
-            : note.type === "warning"
-            ? "⚠️"
-            : "🔔"}
-
-        </div>
-
-        {/* CONTENT */}
-
-        <div>
-
-          <h4 className="text-2xl font-black text-gray-800">
-            {note.title}
-          </h4>
-
-          <p className="text-gray-600 mt-2 text-lg">
-            {note.message}
-          </p>
-
-        </div>
-
-      </div>
-
-    ))}
-
-  </div>
-
-</div>
-{/* DELIVERY TRACKING */}
-
-<div className="bg-white rounded-3xl p-8 shadow-lg mb-10">
-
-  <div className="flex items-center justify-between flex-wrap gap-4">
-
-    <div>
-
-      <h3 className="text-3xl font-black text-gray-800">
-        Delivery Tracking
-      </h3>
-
-      <p className="text-gray-500 mt-2">
-        Live milk delivery updates
-      </p>
-
-    </div>
-
-    <div className="bg-green-100 text-green-700 px-5 py-3 rounded-full font-bold">
-      {deliveryStatus}
-    </div>
-
-  </div>
-
-  {/* DELIVERY BOY */}
-
-  <div className="mt-8 bg-green-50 rounded-3xl p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-
-    <div>
-
-      <h4 className="text-2xl font-black text-gray-800">
-        Ravi Kumar
-      </h4>
-
-      <p className="text-gray-600 mt-2">
-        Delivery Partner
-      </p>
-
-      <p className="text-gray-600 mt-1">
-        Bike: TS09AB1234
-      </p>
-
-    </div>
-
-    <div className="text-green-600 font-black text-2xl">
-      ETA: 6:30 AM
-    </div>
-
-  </div>
-
-  {/* TRACKING STEPS */}
-
-  <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mt-10">
-
-    {deliverySteps.map((step, index) => (
-
-      <div
-        key={index}
-        className={`rounded-3xl p-5 text-center border-2 ${
-          deliverySteps.indexOf(
-            deliveryStatus
-          ) >= index
-            ? "bg-green-100 border-green-500 text-green-700"
-            : "bg-gray-50 border-gray-200 text-gray-400"
-        }`}
-      >
-
-        <div className="text-4xl mb-3">
-
-          {step === "Preparing"
-            ? "🥛"
-            : step ===
-              "Out For Delivery"
-            ? "🛵"
-            : step ===
-              "Reached Nearby"
-            ? "📍"
-            : "✅"}
-
-        </div>
-
-        <div className="font-black text-lg">
-          {step}
-        </div>
-
-      </div>
-
-    ))}
-
-  </div>
-
-</div>
-{/* ORDER HISTORY */}
-
-<div className="bg-white rounded-3xl p-8 shadow-lg mb-10">
-
-  <div className="flex items-center justify-between flex-wrap gap-4">
-
-    <div>
-
-      <h3 className="text-3xl font-black text-gray-800">
-        Order History
-      </h3>
-
-      <p className="text-gray-500 mt-2">
-        Recent milk delivery orders
-      </p>
-
-    </div>
-
-    <div className="bg-blue-100 text-blue-700 px-5 py-3 rounded-full font-bold">
-      {orderHistory.length} Orders
-    </div>
-
-  </div>
-
-  {/* HISTORY LIST */}
-
-  <div className="mt-10 space-y-5">
-
-    {orderHistory.map((order) => (
-
-      <div
-        key={order.id}
-        className="border border-gray-100 rounded-3xl p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-5"
-      >
-
-        {/* LEFT */}
-
-        <div>
-
-          <h4 className="text-2xl font-black text-gray-800">
-            {order.product}
-          </h4>
-
-          <p className="text-gray-500 mt-2">
-            Quantity: {order.qty}L
-          </p>
-
-          <p className="text-gray-500 mt-1">
-            {order.date}
-          </p>
-
-        </div>
-
-        {/* CENTER */}
-
-        <div className="text-3xl font-black text-green-600">
-          ₹{order.amount}
-        </div>
-
-        {/* STATUS */}
-
-        <div
-          className={`px-5 py-3 rounded-full font-bold text-center ${
-            order.status === "Delivered"
-              ? "bg-green-100 text-green-700"
-              : "bg-yellow-100 text-yellow-700"
-          }`}
-        >
-          {order.status}
-        </div>
-
-      </div>
-
-    ))}
-
-  </div>
-
-</div>
-
-    <div className="mt-12 space-y-6">
-
-      {subscriptions.map((sub) => (
-
-        <div
-          key={sub.id}
-          className="bg-white rounded-3xl shadow-lg p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6"
-        >
-
-          {/* DETAILS */}
-
-          <div className="mt-5 space-y-3">
-
-              <div className="flex items-center justify-between border-b pb-3">
-
-                <span className="text-gray-500 font-semibold">
-                  Price Per Liter
-                </span>
-
-                <span className="font-black text-green-600 text-xl">
-                  ₹{sub.price}
-                </span>
-
-              </div>
-
-              <div className="flex items-center justify-between border-b pb-3">
-
-                <span className="text-gray-500 font-semibold">
-                  Daily Quantity
-                </span>
-
-                <span className="font-black text-xl">
-                  {sub.qty}L
-                </span>
-
-              </div>
-
-              <div className="flex items-center justify-between border-b pb-3">
-
-                <span className="text-gray-500 font-semibold">
-                  Monthly Estimate
-                </span>
-
-                <span className="font-black text-blue-600 text-xl">
-                  ₹{sub.qty * sub.price * 30}
-                </span>
-
-              </div>
-
-              <div className="flex items-center justify-between">
-
-                <span className="text-gray-500 font-semibold">
-                  Delivery Slot
-                </span>
-
-                <span className="font-black text-orange-500 text-xl">
-                  {sub.slot}
-                </span>
-
-              </div>
-
-            </div>
-
-          {/* BUTTONS */}
-
-          <div className="flex flex-wrap gap-4">
-
-            {/* CHANGE QTY */}
-
-            <button
-                onClick={() => {
-                    setSubscriptions(
-                    subscriptions.map((item) =>
-                        item.id === sub.id
-                        ? {
-                            ...item,
-                            skipTomorrow:
-                                !item.skipTomorrow,
-                            }
-                        : item
-                    )
-                    );
-                }}
-                className={`px-6 py-3 rounded-2xl font-bold text-white ${
-                    sub.skipTomorrow
-                    ? "bg-red-500"
-                    : "bg-green-600"
-                }`}
-                >
-                {sub.skipTomorrow
-                    ? "Delivery Skipped"
-                    : "Skip Tomorrow"}
-                </button>
-
-            {/* PAUSE / RESUME */}
-
-            <button
-              onClick={() => {
-                setSubscriptions(
-                  subscriptions.map((item) =>
-                    item.id === sub.id
-                      ? {
-                          ...item,
-                          status:
-                            item.status === "Active"
-                              ? "Paused"
-                              : "Active",
-                        }
-                      : item
-                  )
-                );
-              }}
-              className="bg-yellow-500 text-white px-6 py-3 rounded-2xl font-bold"
-            >
-              {sub.status === "Active"
-                ? "Pause"
-                : "Resume"}
-            </button>
-            <button
-                onClick={() => {
-
-                    const confirmDelete = window.confirm(
-                    `Remove ${sub.product} subscription?`
-                    );
-
-                    if (!confirmDelete) return;
-
-                    setSubscriptions(
-                    subscriptions.filter(
-                        (item) => item.id !== sub.id
-                    )
-                    );
-
-                }}
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-bold"
-                >
-                Cancel Plan
-                </button>
-
+        <div className="relative overflow-hidden rounded-[40px] bg-gradient-to-br from-emerald-700 via-green-600 to-emerald-400 shadow-2xl">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-10 left-20 w-72 h-72 bg-white rounded-full blur-3xl"></div>
+            <div className="absolute bottom-10 right-20 w-72 h-72 bg-white rounded-full blur-3xl"></div>
           </div>
 
-        </div>
-
-      ))}
-
-    </div>
-
-  </div>
-
-</section>
-      {/* TOP CARDS */}
-
-      <div className="grid md:grid-cols-3 gap-6 mt-10">
-
-        <div className="bg-white rounded-3xl p-8 shadow-lg">
-
-          <h2 className="text-2xl font-black">
-            My Orders
-          </h2>
-
-          <p className="text-5xl font-black text-green-600 mt-5">
-            {orders.length}
-          </p>
-
-        </div>
-
-        <div className="bg-white rounded-3xl p-8 shadow-lg">
-
-          <h2 className="text-2xl font-black">
-            Total Spent
-          </h2>
-
-          <p className="text-5xl font-black text-blue-600 mt-5">
-            ₹{totalSpent}
-          </p>
-
-        </div>
-
-        <div className="bg-white rounded-3xl p-8 shadow-lg">
-
-          <h2 className="text-2xl font-black">
-            Active Subscriptions
-          </h2>
-
-          <p className="text-5xl font-black text-orange-500 mt-5">
-            {orders.length}
-          </p>
-
-        </div>
-
-      </div>
-
-      {/* ORDERS */}
-
-      <div className="bg-white rounded-3xl p-8 shadow-lg mt-10">
-
-        <h2 className="text-3xl font-black text-gray-800">
-          My Orders
-        </h2>
-
-        <div className="mt-8 space-y-6">
-
-          {orders.map((order) => (
-
-            <div
-              key={order.id}
-              className="border rounded-3xl p-6"
-            >
-
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-
-                <div>
-
-                  <h3 className="text-2xl font-black">
-                    {order.product}
-                  </h3>
-
-                  <p className="text-gray-500 mt-2">
-                    Qty:
-                    {" "}
-                    {order.quantity}L
-                  </p>
-
+          <div className="grid lg:grid-cols-2 gap-6 p-10 relative z-10">
+            <div className="flex flex-col justify-center">
+              <div className="inline-flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center text-2xl">
+                  🌿
                 </div>
 
-                <div className="text-3xl font-black text-green-600">
-                  ₹{order.amount}
-                </div>
-
-                <div className="bg-green-100 text-green-700 px-5 py-3 rounded-full font-bold">
-
-                  {order.status}
-
-                </div>
-
+                <span className="text-green-100 tracking-[4px] font-semibold">
+                  FARM FRESH DAIRY
+                </span>
               </div>
 
+              <h1 className="text-5xl lg:text-7xl font-black text-white leading-tight">
+                Welcome 👋
+              </h1>
+
+              <h2 className="text-4xl lg:text-5xl font-bold text-yellow-100 mt-3">
+                {customerName}
+              </h2>
+
+              <div className="mt-8 inline-flex items-center gap-3 bg-black/20 backdrop-blur-xl px-6 py-4 rounded-full w-fit">
+                <span className="text-2xl">📞</span>
+
+                <span className="text-2xl font-bold text-white">
+                  {customerPhone}
+                </span>
+              </div>
             </div>
 
-          ))}
+            <div className="hidden lg:flex justify-center items-center relative">
+              <div className="absolute w-[400px] h-[400px] border-[30px] border-white/10 rounded-full"></div>
+            </div>
+          </div>
 
+          <div className="absolute bottom-0 left-0 w-full h-24 bg-white rounded-t-[100%]"></div>
         </div>
 
+        {/* SUMMARY */}
+        <div className="grid md:grid-cols-3 gap-6 mb-10">
+              <div className="bg-green-600 text-white rounded-3xl p-6 shadow-lg">
+                <p className="text-lg">Total Subscriptions</p>
+                <h2 className="text-4xl font-black mt-2">
+                  {subscriptions.length}
+                </h2>
+              </div>
+
+              <div className="bg-purple-600 text-white rounded-3xl p-6 shadow-lg">
+                <p className="text-lg">Active Plans</p>
+                <h2 className="text-4xl font-black mt-2">
+                  {subscriptions.filter((s) => s.status === "Active").length}
+                </h2>
+              </div>
+
+              <div className="bg-orange-500 text-white rounded-3xl p-6 shadow-lg">
+                <p className="text-lg">Today's Orders</p>
+                <h2 className="text-4xl font-black mt-2">
+                  {orders.length}
+                </h2>
+              </div>
+            </div>
       </div>
 
+      {/* ACTION BUTTONS */}
+      <div className="grid md:grid-cols-4 gap-4 mb-8">
+        <button
+          onClick={() => navigate("/products")}
+          className="bg-green-600 text-white p-5 rounded-2xl font-bold"
+        >
+          🛒 Order Products
+        </button>
+
+        <button
+          onClick={() => navigate("/subscription")}
+          className="bg-blue-600 text-white p-5 rounded-2xl font-bold"
+        >
+          🥛 Subscribe Milk
+        </button>
+
+        <button
+          onClick={() => navigate("/order-history")}
+          className="bg-orange-500 text-white p-5 rounded-2xl font-bold"
+        >
+          📦 My Orders
+        </button>
+
+        <button
+          onClick={() => navigate("/track-order")}
+          className="bg-purple-600 text-white p-5 rounded-2xl font-bold"
+        >
+          🚚 Track Delivery
+        </button>
+      </div>
+
+      {/* SUBSCRIPTIONS */}
+      <div className="bg-white rounded-3xl shadow-lg p-6 mb-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-3xl font-black text-green-700">
+            🥛 Active Subscriptions
+          </h2>
+
+          <button
+            onClick={() => navigate("/subscription")}
+            className="bg-green-600 text-white px-5 py-3 rounded-xl font-bold"
+          >
+            + Add Subscription
+          </button>
+        </div>
+
+        {subscriptions.length === 0 ? (
+          <div className="text-center py-10">
+            <div className="text-6xl">🥛</div>
+            <h3 className="text-2xl font-bold mt-4">
+              No Active Subscription
+            </h3>
+
+            <button
+              onClick={() => navigate("/subscription")}
+              className="mt-5 bg-green-600 text-white px-6 py-3 rounded-xl"
+            >
+              Subscribe Now
+            </button>
+          </div>
+        ) : (
+          <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-6">
+            {subscriptionsWithStatus.map((sub) => (
+              <div
+                key={sub.subscriptionId}
+                className="bg-gradient-to-br from-green-600 to-emerald-500 rounded-3xl p-6 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+              >
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-3xl font-black">
+                      🥛 {sub.product}
+                    </h3>
+
+                    <p className="text-green-100 mt-1">
+                      Fresh Farm Delivery
+                    </p>
+                  </div>
+
+                  <span
+                    className={`px-4 py-2 rounded-full font-bold ${
+                      sub.computedStatus === "Active"
+                        ? "bg-green-500 text-white"
+                        : sub.computedStatus === "Paused"
+                        ? "bg-orange-500 text-white"
+                        : "bg-red-500 text-white"
+                    }`}
+                  >
+                    {sub.computedStatus}
+                  </span>
+                </div>
+
+                {sub.computedStatus === "Active" &&
+                  sub.remainingDays <= 5 &&
+                  sub.remainingDays > 0 && (
+                    <div className="bg-yellow-100 text-yellow-700 p-3 rounded-xl font-bold mb-4">
+                      ⚠️ Subscription expires in{" "}
+                      {sub.remainingDays} days
+                    </div>
+                  )}
+
+                <div className="mb-5">
+                  <div className="flex justify-between mb-2">
+                    <span>Remaining Days</span>
+
+                    <span>
+                      {sub.computedStatus === "Expired"
+                        ? "Expired"
+                        : sub.computedStatus === "Paused"
+                        ? "Paused"
+                        : `${sub.remainingDays} Days`}
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-white/20 rounded-full h-3">
+                    <div
+                      className="bg-white h-3 rounded-full"
+                      style={{
+                        width: `${Math.min(
+                          (sub.remainingDays / 30) * 100,
+                          100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center mb-5">
+                  <div>
+                    <p className="text-green-100 text-sm">
+                      Monthly Bill
+                    </p>
+
+                    <h3 className="text-3xl font-black">
+                      ₹{sub.price}
+                    </h3>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-green-100 text-sm">
+                      Expiry
+                    </p>
+
+                    <p className="font-bold">
+                      {formatDate(sub.expireDate)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => navigate("/track-order")}
+                    className="bg-white text-green-700 py-3 rounded-2xl font-bold"
+                  >
+                    🚚 Track
+                  </button>
+
+                  {sub.computedStatus === "Expired" ? (
+                    <button
+                      onClick={() => navigate("/subscription")}
+                      className="bg-orange-500 text-white py-3 rounded-2xl font-bold"
+                    >
+                      Renew Plan
+                    </button>
+                  ) : sub.computedStatus === "Paused" ? (
+                    <button
+                      onClick={() =>
+                        updateSubscription(
+                          sub.subscriptionId,
+                          "Active"
+                        )
+                      }
+                      className="py-3 rounded-2xl font-bold bg-green-800 text-white"
+                    >
+                      Resume
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() =>
+                        updateSubscription(
+                          sub.subscriptionId,
+                          "Paused"
+                        )
+                      }
+                      className="py-3 rounded-2xl font-bold bg-red-500 text-white"
+                    >
+                      Pause
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* TODAY ORDERS */}
+      <div className="bg-white rounded-3xl shadow-xl p-6 mt-8">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-3xl font-black text-gray-800">
+            🛒 Today's Orders
+          </h2>
+
+          <span className="bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold">
+            {orders.length} Orders
+          </span>
+        </div>
+
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {orders.map((order, index) => (
+            <div
+              key={index}
+              className="min-w-[280px] bg-white border border-gray-100 rounded-3xl shadow-md hover:shadow-xl transition-all p-5"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center text-2xl">
+                    {order.product?.includes("Curd")
+                      ? "🥣"
+                      : "🥛"}
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-800">
+                      {order.product}
+                    </h3>
+
+                    <p className="text-xs text-green-600">
+                      Farm Fresh Dairy
+                    </p>
+                  </div>
+                </div>
+
+                <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold">
+                  {order.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 my-4">
+                <div className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-xs text-gray-500">
+                    Quantity
+                  </p>
+                  <h4 className="text-2xl font-bold">
+                    {order.qty}
+                  </h4>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl p-3 text-center">
+                  <p className="text-xs text-gray-500">
+                    Amount
+                  </p>
+                  <h4 className="text-2xl font-bold text-green-600">
+                    ₹{order.amount}
+                  </h4>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate("/track-order")}
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold"
+              >
+                🚚 Track Order
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
-
   );
-
 }

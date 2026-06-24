@@ -1,6 +1,8 @@
 import { useState } from "react";
 
 import { db } from "../firebase";
+import { useNavigate } from "react-router-dom";
+
 
 import {
   collection,
@@ -9,7 +11,9 @@ import {
 } from "firebase/firestore";
 
 export default function Auth() {
-
+  const navigate = useNavigate();
+ 
+  
   const [isLogin,
     setIsLogin] =
     useState(true);
@@ -70,6 +74,7 @@ export default function Auth() {
 
   };
 
+
   const handleLogin =
     async () => {
 
@@ -119,8 +124,53 @@ export default function Auth() {
             data.mobile
           );
 
-          window.location.href =
-            "/dashboard";
+         const pendingItem =
+          JSON.parse(
+            localStorage.getItem(
+              "pendingCartItem"
+            )
+          );
+
+        if (pendingItem) {
+
+          const cart =
+            JSON.parse(
+              localStorage.getItem("cart") || "[]"
+            );
+
+          const existing =
+            cart.find(
+              item =>
+                item.name === pendingItem.name
+            );
+
+          if (existing) {
+
+            existing.qty += pendingItem.qty;
+
+          } else {
+
+            cart.push(pendingItem);
+
+          }
+
+          localStorage.setItem(
+            "cart",
+            JSON.stringify(cart)
+          );
+
+          localStorage.removeItem(
+            "pendingCartItem"
+          );
+
+          
+          navigate("/cart");
+
+        } else {
+
+         window.location.href = "/dashboard";
+
+        }
 
         }
 
