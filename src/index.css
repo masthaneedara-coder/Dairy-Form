@@ -7,6 +7,21 @@
 html {
   scroll-behavior: smooth;
 }
+@keyframes marquee-premium {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee-premium {
+  display: inline-block;
+  min-width: max-content;
+  animation: marquee-premium 42s linear infinite;
+  will-change: transform;
+}
 .leaf {
   position: absolute;
   top: -40px;

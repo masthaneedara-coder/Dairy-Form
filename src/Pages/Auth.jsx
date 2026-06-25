@@ -130,16 +130,55 @@ export default function Auth() {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
 
-        if (data.mobile === mobile && data.password === password) {
-          found = true;
+       if (data.mobile === mobile && data.password === password) {
+            found = true;
 
-          localStorage.setItem("customerLogin", "true");
-          localStorage.setItem("userRole", "customer");
-          localStorage.setItem("customerName", data.name || "Customer");
-          localStorage.setItem("customerPhone", data.mobile || "");
+            localStorage.setItem("customerLogin", "true");
+            localStorage.setItem("userRole", "customer");
+            localStorage.setItem("customerName", data.name);
+            localStorage.setItem("customerPhone", data.mobile);
 
-          handlePostCustomerLoginRedirect();
-        }
+            const pendingItem = JSON.parse(
+              localStorage.getItem("pendingCartItem") || "null"
+            );
+
+            const redirectAfterLogin =
+              localStorage.getItem("redirectAfterLogin");
+
+            // Product pending cart item
+            if (pendingItem) {
+              const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+              const existing = cart.find(
+                (item) =>
+                  item.name === pendingItem.name &&
+                  item.size === pendingItem.size
+              );
+
+              if (existing) {
+                existing.qty += pendingItem.qty;
+                existing.total = existing.qty * existing.price;
+              } else {
+                cart.push(pendingItem);
+              }
+
+              localStorage.setItem("cart", JSON.stringify(cart));
+              localStorage.removeItem("pendingCartItem");
+
+              navigate("/cart");
+              return;
+            }
+
+            // Subscription redirect
+            if (redirectAfterLogin) {
+              localStorage.removeItem("redirectAfterLogin");
+              navigate(redirectAfterLogin);
+              return;
+            }
+
+            // Default
+            navigate("/dashboard");
+          }
       });
 
       if (!found) {

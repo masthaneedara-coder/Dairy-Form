@@ -1,9 +1,12 @@
-import { Link, useLocation } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
 
 export default function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [isCustomerLoggedIn, setIsCustomerLoggedIn] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -14,18 +17,12 @@ export default function Navbar() {
   const [deliveryBoyName, setDeliveryBoyName] = useState("");
   const [userRole, setUserRole] = useState("");
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
-    const customerLogin =
-      localStorage.getItem("customerLogin") === "true";
-
-    const adminLogin =
-      localStorage.getItem("adminLogin") === "true";
-
-    const deliveryLogin =
-      localStorage.getItem("deliveryLogin") === "true";
-
+    const customerLogin = localStorage.getItem("customerLogin") === "true";
+    const adminLogin = localStorage.getItem("adminLogin") === "true";
+    const deliveryLogin = localStorage.getItem("deliveryLogin") === "true";
     const role = localStorage.getItem("userRole") || "";
 
     setIsCustomerLoggedIn(customerLogin);
@@ -33,25 +30,27 @@ export default function Navbar() {
     setIsDeliveryLoggedIn(deliveryLogin);
     setUserRole(role);
 
-    setCustomerName(
-      localStorage.getItem("customerName") || "Customer"
-    );
-
+    setCustomerName(localStorage.getItem("customerName") || "Customer");
     setAdminName(localStorage.getItem("adminName") || "Admin");
-
     setDeliveryBoyName(
       localStorage.getItem("deliveryBoyName") || "Delivery Boy"
     );
 
-    setMobileMenuOpen(false);
+    const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const cart = Array.isArray(savedCart) ? savedCart : [];
+    const totalQty = cart.reduce(
+      (sum, item) => sum + Number(item.qty || 0),
+      0
+    );
+    setCartCount(totalQty);
+
+    setMenuOpen(false);
   }, [location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("customerLogin");
     localStorage.removeItem("customerName");
     localStorage.removeItem("customerPhone");
-    localStorage.removeItem("customerAddress");
-    localStorage.removeItem("customerArea");
 
     localStorage.removeItem("adminLogin");
     localStorage.removeItem("adminName");
@@ -60,6 +59,7 @@ export default function Navbar() {
     localStorage.removeItem("deliveryBoyName");
 
     localStorage.removeItem("userRole");
+    localStorage.removeItem("redirectAfterLogin");
 
     setIsCustomerLoggedIn(false);
     setIsAdminLoggedIn(false);
@@ -68,404 +68,278 @@ export default function Navbar() {
     setAdminName("");
     setDeliveryBoyName("");
     setUserRole("");
-    setMobileMenuOpen(false);
+    setMenuOpen(false);
 
-    window.location.href = "/";
+    navigate("/");
   };
 
-  const navLinkBase =
-    "px-4 py-2.5 rounded-xl font-semibold transition";
-  const navBtnBase =
-    "px-4 py-2.5 rounded-xl font-bold shadow-sm transition text-center";
+  const goToSubscription = () => {
+    if (!isCustomerLoggedIn) {
+      localStorage.setItem("redirectAfterLogin", "/subscription");
+      navigate("/auth");
+      return;
+    }
+    navigate("/subscription");
+  };
 
   return (
-    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6">
-        <div className="flex items-center justify-between min-h-[72px] py-3">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 min-w-0">
-            <img
-              src={logo}
-              alt="Farm Fresh Dairy"
-              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full shadow-lg border-2 border-green-100 object-cover flex-shrink-0"
-            />
+    <header className="sticky top-0 z-50">
+      {/* TOP ANNOUNCEMENT BAR */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-green-700 via-emerald-600 to-green-700 shadow-lg border-b border-green-400/30">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.12),transparent_35%)]"></div>
 
-            <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl md:text-3xl font-black bg-gradient-to-r from-green-700 to-emerald-500 bg-clip-text text-transparent leading-tight truncate">
-                FarmFreshDairy
-              </h1>
+        <div className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 text-lg sm:text-2xl animate-bounce">
+          🥛
+        </div>
 
-              <p className="hidden sm:block text-xs md:text-sm text-gray-500 truncate">
-                Pure Milk Delivered Daily
-              </p>
+        <div className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 text-lg sm:text-2xl animate-pulse">
+          🌿
+        </div>
+
+        <div className="relative overflow-hidden px-10 sm:px-14">
+          <div className="animate-marquee-premium whitespace-nowrap py-3 sm:py-3.5 text-white font-extrabold tracking-wide text-sm sm:text-base md:text-lg drop-shadow-sm">
+            ✨ Fresh Farm Milk Delivered Every Morning • 🥛 Pure Cow Milk • 🐃 Fresh Buffalo Milk • 🥣 Fresh Curd Available • 🚚 Free Home Delivery • 📞 Subscribe Today • 🌿 100% Natural & Healthy •
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN NAVBAR */}
+      <div className="bg-white/95 backdrop-blur-xl border-b border-green-100 shadow-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+          <div className="min-h-[76px] sm:h-20 flex items-center justify-between gap-3 py-3 sm:py-0">
+            {/* LEFT LOGO */}
+            <Link to="/" className="flex items-center gap-3 min-w-0 group">
+              <div className="relative flex-shrink-0">
+                <img
+                  src={logo}
+                  alt="Farm Fresh Dairy"
+                  className="w-11 h-11 sm:w-14 sm:h-14 rounded-full border-2 border-green-100 shadow-md group-hover:scale-105 transition duration-300"
+                />
+                <span className="absolute inset-0 rounded-full bg-green-400/10 animate-ping"></span>
+              </div>
+
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-2xl font-black text-green-700 truncate leading-tight">
+                  FarmFreshDairy
+                </h1>
+                <p className="text-[10px] sm:text-sm text-gray-500 truncate">
+                  Pure Milk Delivered Daily
+                </p>
+              </div>
+            </Link>
+
+            {/* RIGHT ACTIONS */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              {/* LOGIN BUTTON */}
+              {!isCustomerLoggedIn &&
+                !isAdminLoggedIn &&
+                !isDeliveryLoggedIn && (
+                  <button
+                    onClick={() => navigate("/auth")}
+                    className="hidden sm:inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white px-4 py-2.5 rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                  >
+                    <span>🔐</span>
+                    <span>Login</span>
+                  </button>
+                )}
+
+              {/* CUSTOMER BADGE */}
+              {isCustomerLoggedIn && userRole === "customer" && (
+                <div className="hidden lg:flex bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm">
+                  👋 {customerName}
+                </div>
+              )}
+
+              {/* ADMIN BADGE */}
+              {isAdminLoggedIn && userRole === "admin" && (
+                <div className="hidden lg:flex bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm">
+                  👨‍💼 {adminName}
+                </div>
+              )}
+
+              {/* DELIVERY BADGE */}
+              {isDeliveryLoggedIn && userRole === "delivery" && (
+                <div className="hidden lg:flex bg-orange-100 text-orange-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm">
+                  🚚 {deliveryBoyName}
+                </div>
+              )}
+
+              {/* CART */}
+              <button
+                onClick={() => navigate("/cart")}
+                className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-2xl border border-green-100 bg-white shadow-md hover:shadow-lg flex items-center justify-center text-lg sm:text-xl hover:scale-105 transition duration-300"
+              >
+                🛒
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] sm:text-[11px] font-bold flex items-center justify-center shadow">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+
+              {/* MENU BUTTON */}
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl border border-green-100 bg-white shadow-md hover:shadow-lg flex items-center justify-center text-xl sm:text-2xl text-green-700 hover:scale-105 transition duration-300"
+              >
+                {menuOpen ? "✕" : "☰"}
+              </button>
             </div>
-          </Link>
+          </div>
 
-          {/* Desktop Menu */}
-          <div className="hidden lg:flex items-center gap-3 flex-wrap justify-end">
+          {/* MOBILE LOGIN BUTTON */}
+          {!isCustomerLoggedIn &&
+            !isAdminLoggedIn &&
+            !isDeliveryLoggedIn && (
+              <div className="sm:hidden pb-3">
+                <button
+                  onClick={() => navigate("/auth")}
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white py-3 rounded-2xl font-bold shadow-md transition duration-300"
+                >
+                  🔐 Login / Signup
+                </button>
+              </div>
+            )}
+        </div>
+      </div>
+
+      {/* DROPDOWN MENU */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ${
+          menuOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="border-t border-gray-100 bg-white/95 backdrop-blur-xl shadow-lg">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-3">
+            {/* COMMON MENU */}
+            <Link
+              to="/"
+              className={`group flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
+                location.pathname === "/"
+                  ? "bg-gradient-to-r from-green-600 to-emerald-500 text-white"
+                  : "bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 hover:from-green-100 hover:to-emerald-100"
+              }`}
+            >
+              <span className="text-lg group-hover:scale-110 transition-transform duration-300">
+                🏠
+              </span>
+              <span>Home</span>
+            </Link>
+
+            <Link
+              to="/products"
+              className={`group flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
+                location.pathname === "/products"
+                  ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white"
+                  : "bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 hover:from-blue-100 hover:to-cyan-100"
+              }`}
+            >
+              <span className="text-lg group-hover:scale-110 transition-transform duration-300">
+                🛍️
+              </span>
+              <span>Products</span>
+            </Link>
+
+            <button
+              onClick={goToSubscription}
+              className={`group flex items-center gap-3 w-full text-left px-4 py-3 rounded-2xl font-bold transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
+                location.pathname === "/subscription"
+                  ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white"
+                  : "bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 hover:from-purple-100 hover:to-pink-100"
+              }`}
+            >
+              <span className="text-lg group-hover:scale-110 transition-transform duration-300">
+                🥛
+              </span>
+              <span>Subscription</span>
+              <span className="ml-auto text-[10px] sm:text-xs px-2.5 py-1 rounded-full bg-white text-purple-700 font-extrabold shadow-sm animate-pulse">
+                POPULAR
+              </span>
+            </button>
+
+            {/* LOGIN BUTTON IN MENU */}
             {!isCustomerLoggedIn &&
               !isAdminLoggedIn &&
               !isDeliveryLoggedIn && (
-                <>
-                  <Link
-                    to="/"
-                    className={`${navLinkBase} text-gray-700 hover:bg-green-50`}
-                  >
-                    Home
-                  </Link>
-
-                  <Link
-                    to="/products"
-                    className={`${navLinkBase} text-gray-700 hover:bg-green-50`}
-                  >
-                    Products
-                  </Link>
-
-                  <Link
-                    to="/auth"
-                    className={`${navBtnBase} bg-green-600 text-white hover:bg-green-700`}
-                  >
-                    Customer Login
-                  </Link>
-
-                  <Link
-                    to="/admin-login"
-                    className={`${navBtnBase} bg-purple-600 text-white hover:bg-purple-700`}
-                  >
-                    Admin Login
-                  </Link>
-
-                  <Link
-                    to="/delivery-login"
-                    className={`${navBtnBase} bg-orange-600 text-white hover:bg-orange-700`}
-                  >
-                    Delivery Login
-                  </Link>
-                </>
+                <button
+                  onClick={() => navigate("/auth")}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 text-white font-bold shadow-md hover:shadow-lg hover:from-green-700 hover:to-emerald-600 transition-all duration-300"
+                >
+                  <span>🔐</span>
+                  <span>Login / Signup</span>
+                </button>
               )}
 
+            {/* CUSTOMER MENU */}
             {isCustomerLoggedIn && userRole === "customer" && (
               <>
-                <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold">
-                  👋 {customerName}
-                </div>
-
                 <Link
                   to="/dashboard"
-                  className={`${navBtnBase} bg-green-50 text-green-700 hover:bg-green-100`}
+                  className="px-4 py-3 rounded-2xl bg-green-50 text-green-700 font-bold hover:bg-green-100 transition"
                 >
                   Dashboard
                 </Link>
 
                 <Link
-                  to="/products"
-                  className={`${navBtnBase} bg-yellow-50 text-yellow-700 hover:bg-yellow-100`}
-                >
-                  Products
-                </Link>
-
-                <Link
-                  to="/subscription"
-                  className={`${navBtnBase} bg-blue-50 text-blue-700 hover:bg-blue-100`}
-                >
-                  Subscribe
-                </Link>
-
-                <Link
                   to="/track-order"
-                  className={`${navBtnBase} bg-indigo-50 text-indigo-700 hover:bg-indigo-100`}
+                  className="px-4 py-3 rounded-2xl bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 transition"
                 >
-                  Track
+                  Track Orders
                 </Link>
 
                 <Link
                   to="/order-history"
-                  className={`${navBtnBase} bg-purple-50 text-purple-700 hover:bg-purple-100`}
+                  className="px-4 py-3 rounded-2xl bg-purple-50 text-purple-700 font-bold hover:bg-purple-100 transition"
                 >
-                  Orders
+                  Order History
                 </Link>
 
                 <button
                   onClick={handleLogout}
-                  className={`${navBtnBase} bg-red-500 text-white hover:bg-red-600`}
+                  className="w-full text-left px-4 py-3 rounded-2xl bg-red-50 text-red-600 font-bold hover:bg-red-100 transition"
                 >
                   Logout
                 </button>
               </>
             )}
 
+            {/* ADMIN MENU */}
             {isAdminLoggedIn && userRole === "admin" && (
               <>
-                <div className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold">
-                  👨‍💼 {adminName}
-                </div>
-
                 <Link
                   to="/admin"
-                  className={`${navBtnBase} bg-purple-50 text-purple-700 hover:bg-purple-100`}
+                  className="px-4 py-3 rounded-2xl bg-purple-50 text-purple-700 font-bold hover:bg-purple-100 transition"
                 >
                   Admin Dashboard
                 </Link>
 
-                <Link
-                  to="/admin-products"
-                  className={`${navBtnBase} bg-blue-50 text-blue-700 hover:bg-blue-100`}
-                >
-                  Products
-                </Link>
-
-                <Link
-                  to="/admin-customers"
-                  className={`${navBtnBase} bg-green-50 text-green-700 hover:bg-green-100`}
-                >
-                  Customers
-                </Link>
-
-                <Link
-                  to="/admin-billing"
-                  className={`${navBtnBase} bg-yellow-50 text-yellow-700 hover:bg-yellow-100`}
-                >
-                  Billing
-                </Link>
-
-                <Link
-                  to="/admin/subscriptions"
-                  className={`${navBtnBase} bg-pink-50 text-pink-700 hover:bg-pink-100`}
-                >
-                  Subscriptions
-                </Link>
-
-                <Link
-                  to="/delivery-management"
-                  className={`${navBtnBase} bg-orange-50 text-orange-700 hover:bg-orange-100`}
-                >
-                  Delivery
-                </Link>
-
                 <button
                   onClick={handleLogout}
-                  className={`${navBtnBase} bg-red-500 text-white hover:bg-red-600`}
+                  className="w-full text-left px-4 py-3 rounded-2xl bg-red-50 text-red-600 font-bold hover:bg-red-100 transition"
                 >
                   Logout
                 </button>
               </>
             )}
 
+            {/* DELIVERY MENU */}
             {isDeliveryLoggedIn && userRole === "delivery" && (
               <>
-                <div className="bg-orange-100 text-orange-700 px-4 py-2 rounded-xl font-bold">
-                  🚚 {deliveryBoyName}
-                </div>
-
                 <Link
                   to="/delivery-boy"
-                  className={`${navBtnBase} bg-orange-50 text-orange-700 hover:bg-orange-100`}
+                  className="px-4 py-3 rounded-2xl bg-orange-50 text-orange-700 font-bold hover:bg-orange-100 transition"
                 >
                   Delivery Panel
                 </Link>
 
                 <button
                   onClick={handleLogout}
-                  className={`${navBtnBase} bg-red-500 text-white hover:bg-red-600`}
+                  className="w-full text-left px-4 py-3 rounded-2xl bg-red-50 text-red-600 font-bold hover:bg-red-100 transition"
                 >
                   Logout
                 </button>
               </>
             )}
-          </div>
-
-          {/* Mobile menu button */}
-          <button
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="lg:hidden flex items-center justify-center w-11 h-11 rounded-2xl border border-green-100 bg-white shadow-sm text-green-700"
-          >
-            {mobileMenuOpen ? "✕" : "☰"}
-          </button>
-        </div>
-
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden pb-4">
-            <div className="rounded-3xl border border-green-100 bg-white shadow-lg p-4 space-y-3">
-              {!isCustomerLoggedIn &&
-                !isAdminLoggedIn &&
-                !isDeliveryLoggedIn && (
-                  <div className="grid gap-3">
-                    <Link
-                      to="/"
-                      className="w-full px-4 py-3 rounded-2xl font-semibold text-gray-700 bg-gray-50 text-center"
-                    >
-                      Home
-                    </Link>
-
-                    <Link
-                      to="/products"
-                      className="w-full px-4 py-3 rounded-2xl font-semibold text-gray-700 bg-gray-50 text-center"
-                    >
-                      Products
-                    </Link>
-
-                    <Link
-                      to="/auth"
-                      className="w-full px-4 py-3 rounded-2xl bg-green-600 text-white font-bold text-center"
-                    >
-                      Customer Login
-                    </Link>
-
-                    <Link
-                      to="/admin-login"
-                      className="w-full px-4 py-3 rounded-2xl bg-purple-600 text-white font-bold text-center"
-                    >
-                      Admin Login
-                    </Link>
-
-                    <Link
-                      to="/delivery-login"
-                      className="w-full px-4 py-3 rounded-2xl bg-orange-600 text-white font-bold text-center"
-                    >
-                      Delivery Login
-                    </Link>
-                  </div>
-                )}
-
-              {isCustomerLoggedIn && userRole === "customer" && (
-                <div className="space-y-3">
-                  <div className="bg-green-100 text-green-700 px-4 py-3 rounded-2xl font-bold text-center">
-                    👋 {customerName}
-                  </div>
-
-                  <Link
-                    to="/dashboard"
-                    className="block w-full px-4 py-3 rounded-2xl bg-green-50 text-green-700 font-bold text-center"
-                  >
-                    Dashboard
-                  </Link>
-
-                  <Link
-                    to="/products"
-                    className="block w-full px-4 py-3 rounded-2xl bg-yellow-50 text-yellow-700 font-bold text-center"
-                  >
-                    Products
-                  </Link>
-
-                  <Link
-                    to="/subscription"
-                    className="block w-full px-4 py-3 rounded-2xl bg-blue-50 text-blue-700 font-bold text-center"
-                  >
-                    Subscribe
-                  </Link>
-
-                  <Link
-                    to="/track-order"
-                    className="block w-full px-4 py-3 rounded-2xl bg-indigo-50 text-indigo-700 font-bold text-center"
-                  >
-                    Track Order
-                  </Link>
-
-                  <Link
-                    to="/order-history"
-                    className="block w-full px-4 py-3 rounded-2xl bg-purple-50 text-purple-700 font-bold text-center"
-                  >
-                    Order History
-                  </Link>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full px-4 py-3 rounded-2xl bg-red-500 text-white font-bold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-
-              {isAdminLoggedIn && userRole === "admin" && (
-                <div className="space-y-3">
-                  <div className="bg-purple-100 text-purple-700 px-4 py-3 rounded-2xl font-bold text-center">
-                    👨‍💼 {adminName}
-                  </div>
-
-                  <Link
-                    to="/admin"
-                    className="block w-full px-4 py-3 rounded-2xl bg-purple-50 text-purple-700 font-bold text-center"
-                  >
-                    Admin Dashboard
-                  </Link>
-
-                  <Link
-                    to="/admin-products"
-                    className="block w-full px-4 py-3 rounded-2xl bg-blue-50 text-blue-700 font-bold text-center"
-                  >
-                    Products
-                  </Link>
-
-                  <Link
-                    to="/admin-customers"
-                    className="block w-full px-4 py-3 rounded-2xl bg-green-50 text-green-700 font-bold text-center"
-                  >
-                    Customers
-                  </Link>
-
-                  <Link
-                    to="/admin-billing"
-                    className="block w-full px-4 py-3 rounded-2xl bg-yellow-50 text-yellow-700 font-bold text-center"
-                  >
-                    Billing
-                  </Link>
-
-                  <Link
-                    to="/admin/subscriptions"
-                    className="block w-full px-4 py-3 rounded-2xl bg-pink-50 text-pink-700 font-bold text-center"
-                  >
-                    Subscriptions
-                  </Link>
-
-                  <Link
-                    to="/delivery-management"
-                    className="block w-full px-4 py-3 rounded-2xl bg-orange-50 text-orange-700 font-bold text-center"
-                  >
-                    Delivery
-                  </Link>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full px-4 py-3 rounded-2xl bg-red-500 text-white font-bold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-
-              {isDeliveryLoggedIn && userRole === "delivery" && (
-                <div className="space-y-3">
-                  <div className="bg-orange-100 text-orange-700 px-4 py-3 rounded-2xl font-bold text-center">
-                    🚚 {deliveryBoyName}
-                  </div>
-
-                  <Link
-                    to="/delivery-boy"
-                    className="block w-full px-4 py-3 rounded-2xl bg-orange-50 text-orange-700 font-bold text-center"
-                  >
-                    Delivery Panel
-                  </Link>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full px-4 py-3 rounded-2xl bg-red-500 text-white font-bold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Announcement */}
-        <div className="pb-3 sm:pb-4">
-          <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-green-600 to-emerald-500 shadow-lg">
-            <div className="whitespace-nowrap py-2.5 sm:py-3 text-white font-bold text-xs sm:text-sm md:text-base animate-marquee px-4">
-              🥛 Fresh Buffalo Milk Delivered Daily • 🚚 Free Morning Delivery • 🌿 100% Farm Fresh • 🧈 Fresh Curd Available • 📞 Subscribe Today •
-            </div>
           </div>
         </div>
       </div>

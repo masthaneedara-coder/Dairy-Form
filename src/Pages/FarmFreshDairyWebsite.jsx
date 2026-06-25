@@ -163,6 +163,18 @@ export default function FarmFreshDairyWebsite() {
     () => (Array.isArray(products) ? products.slice(0, 6) : []),
     [products]
   );
+  const handleSubscriptionClick = () => {
+  const isCustomerLoggedIn =
+    localStorage.getItem("customerLogin") === "true";
+
+  if (!isCustomerLoggedIn) {
+    localStorage.setItem("redirectAfterLogin", "/subscription");
+    navigate("/auth");
+    return;
+  }
+
+  navigate("/subscription");
+};
 
   return (
     <div className="min-h-screen bg-[#f8fff8] text-gray-800 overflow-x-hidden pb-24 lg:pb-0">
@@ -281,7 +293,7 @@ export default function FarmFreshDairyWebsite() {
                         <p className="text-sm text-gray-500">1L Daily</p>
                       </div>
                       <div className="text-green-600 font-black text-lg">
-                        ₹60
+                        ₹70
                       </div>
                     </div>
 
@@ -291,7 +303,7 @@ export default function FarmFreshDairyWebsite() {
                         <p className="text-sm text-gray-500">1L Daily</p>
                       </div>
                       <div className="text-green-600 font-black text-lg">
-                        ₹80
+                        ₹90
                       </div>
                     </div>
 
@@ -307,7 +319,7 @@ export default function FarmFreshDairyWebsite() {
                   </div>
 
                   <button
-                    onClick={() => navigate("/subscription")}
+                    onClick={handleSubscriptionClick}
                     className="w-full mt-5 bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold"
                   >
                     Start Subscription
@@ -530,14 +542,14 @@ export default function FarmFreshDairyWebsite() {
 
                 <div className="mt-8 flex flex-col gap-3">
                   <button
-                    onClick={() => navigate("/subscription")}
+                    onClick={handleSubscriptionClick}
                     className="w-full bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold"
                   >
                     Choose Plan
                   </button>
 
                   <button
-                    onClick={() => navigate("/subscription")}
+                   onClick={handleSubscriptionClick}
                     className="w-full bg-green-50 hover:bg-green-100 text-green-700 py-3.5 rounded-2xl font-bold"
                   >
                     View Subscription Page
@@ -615,7 +627,7 @@ export default function FarmFreshDairyWebsite() {
               </button>
 
               <button
-                onClick={() => navigate("/subscription")}
+               onClick={handleSubscriptionClick}
                 className="bg-black/20 border border-white/20 hover:bg-black/30 px-6 py-3 rounded-2xl font-bold"
               >
                 Start Subscription
@@ -649,7 +661,7 @@ export default function FarmFreshDairyWebsite() {
 
                   <button
                     className="w-full bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold"
-                    onClick={() => navigate("/subscription")}
+                    onClick={handleSubscriptionClick}
                   >
                     Subscribe Now
                   </button>
@@ -847,7 +859,7 @@ export default function FarmFreshDairyWebsite() {
           </button>
 
           <button
-            onClick={() => navigate("/subscription")}
+            onClick={handleSubscriptionClick}
             className="bg-green-50 text-green-700 py-3 rounded-2xl font-bold text-sm"
           >
             Subscribe
