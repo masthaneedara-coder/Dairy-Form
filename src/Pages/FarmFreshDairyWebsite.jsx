@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import logo from "../assets/logo.png";
 import heroImage from "../assets/logo3.png";
-import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-} from "firebase/auth";
 
 export default function FarmFreshDairyWebsite() {
   const navigate = useNavigate();
@@ -16,15 +11,6 @@ export default function FarmFreshDairyWebsite() {
 
   const [products, setProducts] = useState([]);
   const [quantity, setQuantity] = useState({});
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-
-  const [showLogin, setShowLogin] = useState(false);
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
 
   const plans = [
@@ -124,140 +110,11 @@ export default function FarmFreshDairyWebsite() {
     refreshCartCount();
   }, []);
 
-  useEffect(() => {
-    const loginStatus = localStorage.getItem("customerLogin");
-    if (loginStatus === "true") {
-      setIsLoggedIn(true);
-      setCustomerName(localStorage.getItem("customerName") || "Customer");
-      setCustomerPhone(localStorage.getItem("customerPhone") || "");
-    }
-  }, []);
-
-  useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-    return () =>
-      window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
-  useEffect(() => {
-    const enableNotifications = async () => {
-      if ("Notification" in window && Notification.permission === "default") {
-        try {
-          await Notification.requestPermission();
-        } catch (err) {
-          console.log(err);
-        }
-      }
-    };
-    enableNotifications();
-  }, []);
-
   const scrollToSection = (id) => {
-    setMobileMenuOpen(false);
     document.getElementById(id)?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
-  };
-
-  const handlePayment = (price) => {
-    if (!window.Razorpay) {
-      alert("Razorpay not loaded");
-      return;
-    }
-
-    const options = {
-      key: "rzp_live_SryV51ja9BVho8",
-      amount: price * 100,
-      currency: "INR",
-      name: "Farm Fresh Dairy",
-      description: "Milk Subscription",
-      image: logo,
-      handler: function () {
-        alert(`Payment Successful ₹${price}`);
-      },
-      theme: {
-        color: "#16a34a",
-      },
-    };
-
-    const razorpay = new window.Razorpay(options);
-    razorpay.open();
-  };
-
-  const sendOtp = async () => {
-    try {
-      if (!phone) {
-        alert("Enter phone number");
-        return;
-      }
-
-      window.recaptchaVerifier = new RecaptchaVerifier(
-        auth,
-        "recaptcha-container",
-        {}
-      );
-
-      const appVerifier = window.recaptchaVerifier;
-
-      const confirmationResult = await signInWithPhoneNumber(
-        auth,
-        `+91${phone}`,
-        appVerifier
-      );
-
-      window.confirmationResult = confirmationResult;
-      alert("OTP Sent Successfully");
-    } catch (error) {
-      console.log(error);
-      alert(error.message || "OTP failed");
-    }
-  };
-
-  const verifyOtp = async () => {
-    try {
-      await window.confirmationResult.confirm(otp);
-
-      localStorage.setItem("customerLogin", "true");
-      localStorage.setItem("userRole", "customer");
-      localStorage.setItem("customerPhone", phone);
-
-      setIsLoggedIn(true);
-      setCustomerPhone(phone);
-      setShowLogin(false);
-
-      alert("Login Successful");
-    } catch (error) {
-      console.log(error);
-      alert("Invalid OTP");
-    }
-  };
-
-  const installApp = async () => {
-    if (!deferredPrompt) {
-      alert("Install option not available yet");
-      return;
-    }
-
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-  };
-
-  const testNotification = () => {
-    if (Notification.permission === "granted") {
-      new Notification("🥛 Farm Fresh Dairy", {
-        body: "Your milk delivery is on the way 🚚",
-        icon: "/logo.png",
-      });
-    } else {
-      alert("Notification permission not granted");
-    }
   };
 
   const handleProductOrder = (product) => {
@@ -308,8 +165,8 @@ export default function FarmFreshDairyWebsite() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f8fff8] text-gray-800 overflow-x-hidden">
-      {/* Custom Animation CSS */}
+    <div className="min-h-screen bg-[#f8fff8] text-gray-800 overflow-x-hidden pb-24 lg:pb-0">
+      {/* Animations */}
       <style>{`
         @keyframes floatY {
           0%,100% { transform: translateY(0px); }
@@ -319,10 +176,6 @@ export default function FarmFreshDairyWebsite() {
           0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.35); }
           50% { box-shadow: 0 0 0 12px rgba(34,197,94,0); }
         }
-        @keyframes marqueeX {
-          0% { transform: translateX(0%); }
-          100% { transform: translateX(-50%); }
-        }
         @keyframes fadeUp {
           0% { opacity: 0; transform: translateY(24px); }
           100% { opacity: 1; transform: translateY(0); }
@@ -330,189 +183,7 @@ export default function FarmFreshDairyWebsite() {
         .animate-floatY { animation: floatY 4s ease-in-out infinite; }
         .animate-glow { animation: pulseGlow 2.2s infinite; }
         .animate-fadeUp { animation: fadeUp .8s ease forwards; }
-        .animate-marqueeX {
-          display: inline-flex;
-          min-width: max-content;
-          animation: marqueeX 20s linear infinite;
-        }
       `}</style>
-
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 border-b border-green-100 bg-white/90 backdrop-blur-xl shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="h-16 sm:h-20 flex items-center justify-between gap-3">
-            {/* Logo */}
-            <div
-              className="flex items-center gap-3 cursor-pointer min-w-0"
-              onClick={() => navigate("/")}
-            >
-              <img
-                src={logo}
-                alt="Farm Fresh Dairy"
-                className="w-11 h-11 sm:w-14 sm:h-14 rounded-full border-2 border-green-100 shadow-md object-cover"
-              />
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-green-800 leading-tight truncate">
-                  Farm Fresh Dairy
-                </h1>
-                <p className="text-[10px] sm:text-xs text-gray-500">
-                  Pure Milk Delivered Daily
-                </p>
-              </div>
-            </div>
-
-            {/* Desktop Menu */}
-            <div className="hidden lg:flex items-center gap-3">
-              <button
-                onClick={() => scrollToSection("products")}
-                className="px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-green-50"
-              >
-                Products
-              </button>
-
-              <button
-                onClick={() => scrollToSection("plans")}
-                className="px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-green-50"
-              >
-                Plans
-              </button>
-
-              <button
-                onClick={() => scrollToSection("contact")}
-                className="px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-green-50"
-              >
-                Contact
-              </button>
-
-              <button
-                onClick={() => navigate("/products")}
-                className="px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-green-50"
-              >
-                Shop
-              </button>
-
-              <button
-                onClick={() => navigate("/cart")}
-                className="relative px-4 py-2 rounded-xl font-semibold text-gray-700 hover:bg-green-50"
-              >
-                Cart
-                {cartCount > 0 && (
-                  <span className="absolute -top-2 -right-2 min-w-[22px] h-5 px-1 rounded-full bg-red-500 text-white text-[11px] flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-
-              {isLoggedIn ? (
-                <button
-                  onClick={() => navigate("/dashboard")}
-                  className="px-5 py-2.5 rounded-2xl bg-green-600 text-white font-bold hover:bg-green-700"
-                >
-                  Dashboard
-                </button>
-              ) : (
-                <button
-                  onClick={() => navigate("/auth")}
-                  className="px-5 py-2.5 rounded-2xl bg-green-600 text-white font-bold hover:bg-green-700"
-                >
-                  Login
-                </button>
-              )}
-            </div>
-
-            {/* Mobile Actions */}
-            <div className="flex lg:hidden items-center gap-2">
-              <button
-                onClick={() => navigate("/cart")}
-                className="relative w-11 h-11 rounded-xl border border-green-100 bg-white shadow-sm flex items-center justify-center"
-              >
-                🛒
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setMobileMenuOpen((prev) => !prev)}
-                className="w-11 h-11 rounded-xl border border-green-100 bg-white shadow-sm flex items-center justify-center text-xl"
-              >
-                {mobileMenuOpen ? "✕" : "☰"}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Menu */}
-          {mobileMenuOpen && (
-            <div className="lg:hidden pb-4 animate-fadeUp">
-              <div className="rounded-2xl border border-green-100 bg-white shadow-md p-3 flex flex-col gap-2">
-                <button
-                  onClick={() => scrollToSection("products")}
-                  className="text-left px-4 py-3 rounded-xl hover:bg-green-50 font-semibold"
-                >
-                  Products
-                </button>
-                <button
-                  onClick={() => scrollToSection("plans")}
-                  className="text-left px-4 py-3 rounded-xl hover:bg-green-50 font-semibold"
-                >
-                  Plans
-                </button>
-                <button
-                  onClick={() => scrollToSection("contact")}
-                  className="text-left px-4 py-3 rounded-xl hover:bg-green-50 font-semibold"
-                >
-                  Contact
-                </button>
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    navigate("/products");
-                  }}
-                  className="text-left px-4 py-3 rounded-xl hover:bg-green-50 font-semibold"
-                >
-                  Shop
-                </button>
-
-                {isLoggedIn ? (
-                  <button
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      navigate("/dashboard");
-                    }}
-                    className="w-full mt-1 px-4 py-3 rounded-xl bg-green-600 text-white font-bold"
-                  >
-                    Dashboard
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      navigate("/auth");
-                    }}
-                    className="w-full mt-1 px-4 py-3 rounded-xl bg-green-600 text-white font-bold"
-                  >
-                    Login
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Announcement Bar */}
-        <div className="overflow-hidden bg-gradient-to-r from-green-600 to-emerald-500 text-white">
-          <div className="animate-marqueeX py-2.5 text-sm sm:text-base font-bold">
-            <span className="px-8">
-              🥛 Fresh Buffalo Milk Delivered Daily • 🚚 Free Morning Delivery • 🌿 100% Farm Fresh • 🧈 Fresh Curd Available • 📞 Subscribe Today •
-            </span>
-            <span className="px-8">
-              🥛 Fresh Buffalo Milk Delivered Daily • 🚚 Free Morning Delivery • 🌿 100% Farm Fresh • 🧈 Fresh Curd Available • 📞 Subscribe Today •
-            </span>
-          </div>
-        </div>
-      </header>
 
       {/* HERO */}
       <section className="relative overflow-hidden">
@@ -522,7 +193,6 @@ export default function FarmFreshDairyWebsite() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/55 to-black/45" />
 
-        {/* floating circles */}
         <div className="absolute top-16 left-6 sm:left-12 w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-white/10 blur-xl animate-floatY" />
         <div className="absolute bottom-16 right-8 sm:right-20 w-20 h-20 sm:w-32 sm:h-32 rounded-full bg-green-400/20 blur-2xl animate-floatY" />
 
@@ -546,7 +216,6 @@ export default function FarmFreshDairyWebsite() {
                 subscription plans, and easy ordering from mobile or WhatsApp.
               </p>
 
-              {/* badges */}
               <div className="mt-6 flex flex-wrap gap-3">
                 <span className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold border border-white/15">
                   🚚 Same Day Delivery
@@ -575,31 +244,17 @@ export default function FarmFreshDairyWebsite() {
                 </button>
 
                 <button
-                  onClick={() => window.open("https://wa.me/919989663837", "_blank")}
+                  onClick={() =>
+                    window.open("https://wa.me/919989663837", "_blank")
+                  }
                   className="bg-emerald-500 hover:bg-emerald-600 px-6 py-3.5 rounded-2xl font-bold text-sm sm:text-base"
                 >
                   WhatsApp Order
                 </button>
               </div>
-
-              <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={testNotification}
-                  className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-2xl font-bold text-sm"
-                >
-                  Test Notification
-                </button>
-
-                <button
-                  onClick={installApp}
-                  className="bg-black/70 hover:bg-black px-5 py-3 rounded-2xl font-bold text-sm border border-white/10"
-                >
-                  📱 Install App
-                </button>
-              </div>
             </div>
 
-            {/* Right card */}
+            {/* Right Card */}
             <div className="flex justify-center lg:justify-end animate-fadeUp">
               <div className="w-full max-w-sm rounded-[28px] bg-white/95 backdrop-blur-md shadow-2xl p-4 sm:p-5 border border-white/50">
                 <div className="rounded-[24px] bg-gradient-to-br from-green-50 to-white p-4 sm:p-5">
@@ -625,7 +280,9 @@ export default function FarmFreshDairyWebsite() {
                         <p className="font-bold">Cow Milk</p>
                         <p className="text-sm text-gray-500">1L Daily</p>
                       </div>
-                      <div className="text-green-600 font-black text-lg">₹60</div>
+                      <div className="text-green-600 font-black text-lg">
+                        ₹60
+                      </div>
                     </div>
 
                     <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
@@ -633,7 +290,9 @@ export default function FarmFreshDairyWebsite() {
                         <p className="font-bold">Buffalo Milk</p>
                         <p className="text-sm text-gray-500">1L Daily</p>
                       </div>
-                      <div className="text-green-600 font-black text-lg">₹80</div>
+                      <div className="text-green-600 font-black text-lg">
+                        ₹80
+                      </div>
                     </div>
 
                     <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
@@ -641,7 +300,9 @@ export default function FarmFreshDairyWebsite() {
                         <p className="font-bold">Fresh Curd</p>
                         <p className="text-sm text-gray-500">500ml</p>
                       </div>
-                      <div className="text-green-600 font-black text-lg">₹50</div>
+                      <div className="text-green-600 font-black text-lg">
+                        ₹50
+                      </div>
                     </div>
                   </div>
 
@@ -690,7 +351,8 @@ export default function FarmFreshDairyWebsite() {
               Why Choose Farm Fresh Dairy
             </h2>
             <p className="text-gray-500 mt-3 text-sm sm:text-lg max-w-3xl mx-auto">
-              Fresh quality dairy products, reliable delivery, and a smooth mobile ordering experience.
+              Fresh quality dairy products, reliable delivery, and a smooth
+              mobile ordering experience.
             </p>
           </div>
 
@@ -716,7 +378,10 @@ export default function FarmFreshDairyWebsite() {
       </section>
 
       {/* PRODUCTS */}
-      <section id="products" className="py-14 sm:py-16 lg:py-20 bg-white px-4 sm:px-6">
+      <section
+        id="products"
+        className="py-14 sm:py-16 lg:py-20 bg-white px-4 sm:px-6"
+      >
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-10">
             <div>
@@ -750,7 +415,9 @@ export default function FarmFreshDairyWebsite() {
                   />
 
                   <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-sm font-bold text-green-700 shadow">
-                    {Number(product.stock || 0) > 0 ? "In Stock" : "Out Of Stock"}
+                    {Number(product.stock || 0) > 0
+                      ? "In Stock"
+                      : "Out Of Stock"}
                   </div>
                 </div>
 
@@ -764,7 +431,9 @@ export default function FarmFreshDairyWebsite() {
                       <div className="text-green-600 text-2xl sm:text-3xl font-black">
                         ₹{product.price}
                       </div>
-                      <div className="text-xs sm:text-sm text-gray-500">per litre</div>
+                      <div className="text-xs sm:text-sm text-gray-500">
+                        per litre
+                      </div>
                     </div>
                   </div>
 
@@ -797,7 +466,9 @@ export default function FarmFreshDairyWebsite() {
                         : "bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
                     }`}
                   >
-                    {Number(product.stock || 0) <= 0 ? "Out Of Stock" : "🛒 Order Now"}
+                    {Number(product.stock || 0) <= 0
+                      ? "Out Of Stock"
+                      : "🛒 Order Now"}
                   </button>
                 </div>
               </div>
@@ -807,7 +478,10 @@ export default function FarmFreshDairyWebsite() {
       </section>
 
       {/* SUBSCRIPTION PLANS */}
-      <section id="plans" className="py-14 sm:py-16 lg:py-20 bg-green-50 px-4 sm:px-6">
+      <section
+        id="plans"
+        className="py-14 sm:py-16 lg:py-20 bg-green-50 px-4 sm:px-6"
+      >
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-10 sm:mb-12">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900">
@@ -823,7 +497,9 @@ export default function FarmFreshDairyWebsite() {
               <div
                 key={i}
                 className={`relative bg-white rounded-3xl p-6 sm:p-8 shadow-lg border transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${
-                  i === 1 ? "border-green-500 ring-2 ring-green-100" : "border-green-100"
+                  i === 1
+                    ? "border-green-500 ring-2 ring-green-100"
+                    : "border-green-100"
                 }`}
               >
                 <div className="absolute top-5 right-5 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">
@@ -854,17 +530,7 @@ export default function FarmFreshDairyWebsite() {
 
                 <div className="mt-8 flex flex-col gap-3">
                   <button
-                    onClick={() => {
-                      const loggedIn =
-                        localStorage.getItem("customerLogin") === "true";
-
-                      if (!loggedIn) {
-                        navigate("/auth");
-                        return;
-                      }
-
-                      handlePayment(plan.price);
-                    }}
+                    onClick={() => navigate("/subscription")}
                     className="w-full bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold"
                   >
                     Choose Plan
@@ -1001,76 +667,11 @@ export default function FarmFreshDairyWebsite() {
         </div>
       </section>
 
-      {/* LABEL / PACKAGING SECTION */}
-      <section className="py-14 sm:py-16 lg:py-20 bg-gray-50 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-10 sm:mb-12">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900">
-              Milk Product Label Design
-            </h2>
-            <p className="text-gray-500 mt-3 text-sm sm:text-lg">
-              Premium sticker and bottle label inspiration.
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-3xl overflow-hidden shadow-lg">
-              <img
-                src="https://images.unsplash.com/photo-1517448931760-9bf4414148c5?q=80&w=1200&auto=format&fit=crop"
-                alt="Premium Cow Milk Label"
-                className="w-full h-64 sm:h-80 object-cover"
-              />
-
-              <div className="p-6">
-                <h3 className="text-2xl sm:text-3xl font-black">
-                  Premium Cow Milk Label
-                </h3>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <span className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-bold text-sm">
-                    Waterproof
-                  </span>
-                  <span className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-bold text-sm">
-                    Premium Finish
-                  </span>
-                  <span className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-bold text-sm">
-                    Food Safe
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl overflow-hidden shadow-lg">
-              <img
-                src="https://images.unsplash.com/photo-1488477181946-6428a0291777?q=80&w=1200&auto=format&fit=crop"
-                alt="Fresh Dairy Bottle Label"
-                className="w-full h-64 sm:h-80 object-cover"
-              />
-
-              <div className="p-6">
-                <h3 className="text-2xl sm:text-3xl font-black">
-                  Fresh Dairy Bottle Label
-                </h3>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <span className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-bold text-sm">
-                    Waterproof
-                  </span>
-                  <span className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-bold text-sm">
-                    Premium Finish
-                  </span>
-                  <span className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-bold text-sm">
-                    Food Safe
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CONTACT */}
-      <section id="contact" className="py-14 sm:py-16 lg:py-20 bg-white px-4 sm:px-6">
+      <section
+        id="contact"
+        className="py-14 sm:py-16 lg:py-20 bg-white px-4 sm:px-6"
+      >
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-8 lg:gap-12">
           <div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900">
@@ -1080,7 +681,8 @@ export default function FarmFreshDairyWebsite() {
             <p className="text-gray-600 mt-5 sm:mt-6 text-sm sm:text-lg lg:text-xl leading-7 sm:leading-9 max-w-2xl">
               Farm Fresh Dairy delivers pure and hygienic milk directly from our
               dairy farm to customers every morning. We provide Cow Milk,
-              Buffalo Milk, Fresh Curd, and monthly subscription plans with home delivery service.
+              Buffalo Milk, Fresh Curd, and monthly subscription plans with
+              home delivery service.
             </p>
 
             <div className="mt-8 space-y-4 text-base sm:text-xl">
@@ -1092,7 +694,9 @@ export default function FarmFreshDairyWebsite() {
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() => window.open("https://wa.me/919989663837", "_blank")}
+                onClick={() =>
+                  window.open("https://wa.me/919989663837", "_blank")
+                }
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-2xl font-bold"
               >
                 WhatsApp Us
@@ -1159,23 +763,36 @@ export default function FarmFreshDairyWebsite() {
               </div>
 
               <p className="mt-4 text-green-100 leading-7 max-w-md">
-                Fresh dairy products, subscriptions, and daily delivery for your family.
+                Fresh dairy products, subscriptions, and daily delivery for your
+                family.
               </p>
             </div>
 
             <div>
               <h4 className="font-black text-xl mb-4">Quick Links</h4>
               <div className="flex flex-col gap-3 text-green-100">
-                <button onClick={() => scrollToSection("products")} className="text-left hover:text-white">
+                <button
+                  onClick={() => scrollToSection("products")}
+                  className="text-left hover:text-white"
+                >
                   Products
                 </button>
-                <button onClick={() => scrollToSection("plans")} className="text-left hover:text-white">
+                <button
+                  onClick={() => scrollToSection("plans")}
+                  className="text-left hover:text-white"
+                >
                   Plans
                 </button>
-                <button onClick={() => scrollToSection("contact")} className="text-left hover:text-white">
+                <button
+                  onClick={() => scrollToSection("contact")}
+                  className="text-left hover:text-white"
+                >
                   Contact
                 </button>
-                <button onClick={() => navigate("/products")} className="text-left hover:text-white">
+                <button
+                  onClick={() => navigate("/products")}
+                  className="text-left hover:text-white"
+                >
                   Shop
                 </button>
               </div>
@@ -1237,67 +854,15 @@ export default function FarmFreshDairyWebsite() {
           </button>
 
           <button
-            onClick={() => window.open("https://wa.me/919989663837", "_blank")}
+            onClick={() =>
+              window.open("https://wa.me/919989663837", "_blank")
+            }
             className="bg-emerald-500 text-white py-3 rounded-2xl font-bold text-sm"
           >
             WhatsApp
           </button>
         </div>
       </div>
-
-      {/* LOGIN MODAL */}
-      {showLogin && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl">
-            <h2 className="text-3xl sm:text-4xl font-black text-center text-green-700">
-              Customer Login
-            </h2>
-
-            <p className="text-center text-gray-500 mt-3">
-              Login with mobile OTP
-            </p>
-
-            <input
-              type="text"
-              placeholder="Enter Mobile Number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full border rounded-2xl px-4 py-3 mt-6 outline-none focus:ring-2 focus:ring-green-200"
-            />
-
-            <button
-              onClick={sendOtp}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold mt-4"
-            >
-              Send OTP
-            </button>
-
-            <input
-              type="text"
-              placeholder="Enter OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="w-full border rounded-2xl px-4 py-3 mt-4 outline-none focus:ring-2 focus:ring-green-200"
-            />
-
-            <div id="recaptcha-container" className="mt-4" />
-
-            <button
-              onClick={verifyOtp}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-2xl font-bold mt-4"
-            >
-              Verify OTP
-            </button>
-
-            <button
-              onClick={() => setShowLogin(false)}
-              className="w-full mt-4 text-gray-500 font-bold"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
