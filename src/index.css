@@ -2,96 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---------- ROOT VARIABLES ---------- */
-:root {
-  --text: #4b5563;
-  --text-h: #14532d;
-  --bg: #f8fafc;
-  --border: #e5e7eb;
-  --code-bg: #f3f4f6;
-  --accent: #16a34a;
-  --accent-bg: rgba(22, 163, 74, 0.12);
-  --accent-border: rgba(22, 163, 74, 0.25);
-  --social-bg: rgba(255, 255, 255, 0.7);
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-
-  --heading: "Poppins", sans-serif;
-  --mono: "Courier New", monospace;
-}
-
 html {
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: "Poppins", sans-serif;
-}
-
-#root {
-  width: 100%;
-  max-width: 100%;
-  margin: 0 auto;
-  min-height: 100vh;
-  box-sizing: border-box;
-}
-
-/* ---------- HEADINGS ---------- */
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 700;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1px;
-  margin: 32px 0;
-}
-
-h2 {
-  font-size: 24px;
-  line-height: 1.2;
-  margin: 0 0 8px;
-}
-
-p {
-  margin: 0;
-}
-
-/* ---------- CODE ---------- */
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 1.35;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
-/* ---------- ANNOUNCEMENT MARQUEE ---------- */
-@keyframes marquee {
-  0% {
-    transform: translateX(100%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
-}
-
-.animate-marquee {
-  display: inline-block;
-  white-space: nowrap;
-  animation: marquee 22s linear infinite;
+  padding: 0;
+  background: #f8fafc;
 }
 
 @keyframes marquee-premium {
@@ -106,16 +24,14 @@ code {
 .animate-marquee-premium {
   display: inline-block;
   min-width: max-content;
-  white-space: nowrap;
   animation: marquee-premium 40s linear infinite;
   will-change: transform;
 }
 
-/* ---------- FALLING LEAVES ---------- */
 .leaf {
   position: absolute;
   top: -40px;
-  font-size: 28px;
+  font-size: 30px;
   opacity: 0.55;
   pointer-events: none;
   animation: fall linear infinite;
@@ -167,60 +83,5 @@ code {
   100% {
     transform: translateY(260px) translateX(-14px) rotate(240deg) scale(0.95);
     opacity: 0;
-  }
-}
-
-/* ---------- SOFT FLOAT ---------- */
-@keyframes float-soft {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-.animate-float-soft {
-  animation: float-soft 3s ease-in-out infinite;
-}
-
-/* ---------- DARK MODE ---------- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #d1d5db;
-    --text-h: #f3f4f6;
-    --bg: #111827;
-    --border: #374151;
-    --code-bg: #1f2937;
-    --accent: #22c55e;
-    --accent-bg: rgba(34, 197, 94, 0.12);
-    --accent-border: rgba(34, 197, 94, 0.3);
-    --social-bg: rgba(31, 41, 55, 0.6);
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  }
-}
-
-/* ---------- MOBILE ---------- */
-@media (max-width: 1024px) {
-  h1 {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-
-  h2 {
-    font-size: 20px;
-  }
-
-  .leaf {
-    font-size: 22px;
-  }
-
-  .animate-marquee {
-    animation-duration: 18s;
-  }
-
-  .animate-marquee-premium {
-    animation-duration: 28s;
   }
 }

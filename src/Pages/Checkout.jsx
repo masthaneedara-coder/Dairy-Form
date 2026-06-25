@@ -1,258 +1,150 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Checkout() {
+  const navigate = useNavigate();
+
   const SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbxrawDo75QKP1RwDwjjAKwoE0-so9UdTG2V4Dpq94PF8KOrMNx4CpfBEuNlk7VvblII/exec";
 
-  const navigate = useNavigate();
+  const customerName = localStorage.getItem("customerName") || "";
+  const customerPhone = localStorage.getItem("customerPhone") || "";
+  const savedAddress = localStorage.getItem("customerAddress") || "";
+  const savedArea = localStorage.getItem("customerArea") || "";
 
-  const getSavedCart = () => {
-    try {
-      const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
-      return Array.isArray(savedCart) ? savedCart : [];
-    } catch {
-      return [];
-    }
-  };
+  const [name, setName] = useState(customerName);
+  const [phone, setPhone] = useState(customerPhone);
+  const [address, setAddress] = useState(savedAddress);
+  const [area, setArea] = useState(savedArea);
+  const [paymentMethod, setPaymentMethod] = useState("whatsapp");
+  const [loading, setLoading] = useState(false);
 
-  const getSavedSubscription = () => {
-    try {
-      const saved = JSON.parse(
-        localStorage.getItem("subscriptionCart") || "null"
-      );
-      return saved || null;
-    } catch {
-      return null;
-    }
-  };
+  const cart = useMemo(() => {
+    const raw = JSON.parse(localStorage.getItem("cart") || "[]");
+    return Array.isArray(raw) ? raw : [];
+  }, []);
 
-  const [cart, setCart] = useState([]);
-  const [subscription, setSubscription] = useState(null);
-
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cod");
-  const [placing, setPlacing] = useState(false);
-
-  useEffect(() => {
-    const isLoggedIn = localStorage.getItem("customerLogin") === "true";
-
-    if (!isLoggedIn) {
-      localStorage.setItem("afterLoginRedirect", "/checkout");
-      navigate("/auth");
-      return;
-    }
-
-    const savedCart = getSavedCart();
-    const savedSubscription = getSavedSubscription();
-
-    setCart(savedCart);
-    setSubscription(savedSubscription);
-
-    const savedPhone = localStorage.getItem("customerPhone") || "";
-    const savedName = localStorage.getItem("customerName") || "";
-    const savedAddress = localStorage.getItem("customerAddress") || "";
-
-    setPhone(savedPhone);
-    setName(savedName);
-    setAddress(savedAddress);
-  }, [navigate]);
-
-  const productTotal = useMemo(
-    () =>
-      cart.reduce(
-        (sum, item) =>
-          sum + Number(item.price || 0) * Number(item.qty || 0),
-        0
-      ),
-    [cart]
+  const total = cart.reduce(
+    (sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0),
+    0
   );
 
-  const subscriptionTotal = Number(subscription?.monthlyAmount || 0);
-  const subtotal = productTotal + subscriptionTotal;
+  const saveOrder = async () => {
+    const orderPayload = {
+      action: "placeOrder",
+      customerName: name,
+      phone,
+      address,
+      area,
+      paymentMethod,
+      total,
+      items: cart,
+      orderDate: new Date().toISOString(),
+      status: "Pending",
+    };
 
-  const gst =
-    paymentMethod === "online"
-      ? Math.round(subtotal * 0.02)
-      : 0;
-
-  const grandTotal = subtotal + gst;
-
-  const hasAnythingToCheckout =
-    cart.length > 0 || !!subscription;
-
-  const saveOrdersToSheet = async () => {
-    for (const item of cart) {
-      const res = await fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8",
-        },
-        body: JSON.stringify({
-          action: "placeOrder",
-          customerName: name,
-          phone,
-          address,
-          product: item.name,
-          qty: item.qty,
-          size: item.size || "1L",
-          price: Number(item.price || 0),
-          amount: Number(item.price || 0) * Number(item.qty || 0),
-          paymentMethod,
-          status: "Pending",
-        }),
-      });
-
-      const result = await res.json();
-
-      if (!result.success) {
-        throw new Error(result.message || "Failed to place product order");
-      }
-    }
-  };
-
-  const saveSubscriptionToSheet = async () => {
-    if (!subscription) return;
-
-    const res = await fetch(SCRIPT_URL, {
+    const response = await fetch(SCRIPT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "text/plain;charset=utf-8",
       },
-      body: JSON.stringify({
-        action: "addSubscription",
-        customerName: name,
-        phone,
-        address,
-        product: subscription.product,
-        qty: subscription.qty,
-        price: subscription.monthlyAmount,
-        deliveryType: subscription.deliveryType,
-        startDate: subscription.startDate,
-        expireDate: subscription.expireDate,
-        paymentMethod,
-        status: "Active",
-      }),
+      body: JSON.stringify(orderPayload),
     });
 
-    const result = await res.json();
-
-    if (!result.success) {
-      throw new Error(result.message || "Failed to save subscription");
-    }
+    return await response.json();
   };
 
-  const saveAll = async () => {
-    if (cart.length > 0) {
-      await saveOrdersToSheet();
-    }
-
-    if (subscription) {
-      await saveSubscriptionToSheet();
-    }
-  };
-
-  const clearAfterSuccess = () => {
-    localStorage.removeItem("cart");
-    localStorage.removeItem("subscriptionCart");
-    localStorage.setItem("customerAddress", address);
-  };
-
-  const buildWhatsAppMessage = () => {
-    const productLines =
-      cart.length > 0
-        ? cart
-            .map(
-              (item) =>
-                `${item.name} (${item.size || "1L"}) x ${item.qty} = ₹${
-                  Number(item.price || 0) * Number(item.qty || 0)
-                }`
-            )
-            .join("\n")
-        : "No product items";
-
-    const subscriptionText = subscription
-      ? `
-Subscription:
-Product: ${subscription.product}
-Quantity: ${subscription.qty}
-Delivery: ${subscription.deliveryType}
-Start: ${subscription.startDate}
-Expire: ${subscription.expireDate}
-Monthly Amount: ₹${subscription.monthlyAmount}
-`
-      : "No subscription selected";
-
-    return `
-Farm Fresh Dairy Order
-
-Name: ${name}
-Phone: ${phone}
-Address: ${address}
-
-Products:
-${productLines}
-
-${subscriptionText}
-
-Subtotal: ₹${subtotal}
-${paymentMethod === "online" ? `GST: ₹${gst}` : ""}
-Grand Total: ₹${grandTotal}
-Payment Method: ${paymentMethod}
-`;
-  };
-
-  const placeOrder = async () => {
-    if (!name || !phone || !address) {
-      alert("Please fill all customer details");
+  const handlePlaceOrder = async () => {
+    if (!name || !phone || !address || !area) {
+      alert("Please fill customer details");
       return;
     }
 
-    if (!hasAnythingToCheckout) {
+    if (cart.length === 0) {
       alert("Cart is empty");
       return;
     }
 
     try {
-      setPlacing(true);
+      setLoading(true);
 
       if (paymentMethod === "whatsapp") {
-        const whatsappNumber = "919989663837";
-        const message = buildWhatsAppMessage();
+        const result = await saveOrder();
+
+        if (!result.success) {
+          alert(result.message || "Order failed");
+          return;
+        }
+
+        const orderText = cart
+          .map(
+            (item) =>
+              `${item.name} - ${item.size} - Qty: ${item.qty} - ₹${item.total}`
+          )
+          .join("\n");
+
+        const message = `
+Farm Fresh Dairy Order
+
+Customer: ${name}
+Phone: ${phone}
+Address: ${address}
+Area: ${area}
+
+Items:
+${orderText}
+
+Total: ₹${total}
+Payment: WhatsApp Order
+        `;
 
         window.open(
-          `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`,
+          `https://wa.me/919989663837?text=${encodeURIComponent(message)}`,
           "_blank"
         );
 
-        await saveAll();
-        clearAfterSuccess();
         alert("Order placed successfully");
+        localStorage.setItem("customerAddress", address);
+        localStorage.setItem("customerArea", area);
+        localStorage.removeItem("cart");
         navigate("/dashboard");
         return;
       }
 
       if (paymentMethod === "online") {
+        if (!window.Razorpay) {
+          alert("Razorpay not loaded");
+          return;
+        }
+
         const options = {
           key: "rzp_live_SryV51ja9BVho8",
-          amount: grandTotal * 100,
+          amount: total * 100,
           currency: "INR",
           name: "Farm Fresh Dairy",
           description: "Milk Order Payment",
           handler: async function () {
             try {
-              await saveAll();
-              clearAfterSuccess();
-              alert("Payment successful and order placed");
+              const result = await saveOrder();
+
+              if (!result.success) {
+                alert(result.message || "Payment success, order save failed");
+                return;
+              }
+
+              alert("Payment successful & order placed");
+              localStorage.setItem("customerAddress", address);
+              localStorage.setItem("customerArea", area);
+              localStorage.removeItem("cart");
               navigate("/dashboard");
-            } catch (error) {
-              alert(
-                error.message ||
-                  "Payment success, but order save failed"
-              );
+            } catch (err) {
+              console.error(err);
+              alert("Payment success, but order save failed");
             }
+          },
+          prefill: {
+            name,
+            contact: phone,
           },
           theme: {
             color: "#16a34a",
@@ -264,211 +156,218 @@ Payment Method: ${paymentMethod}
         return;
       }
 
-      await saveAll();
-      clearAfterSuccess();
-      alert("Order placed successfully");
-      navigate("/dashboard");
+      if (paymentMethod === "cod") {
+        const result = await saveOrder();
+
+        if (!result.success) {
+          alert(result.message || "Order failed");
+          return;
+        }
+
+        alert("Order placed successfully");
+        localStorage.setItem("customerAddress", address);
+        localStorage.setItem("customerArea", area);
+        localStorage.removeItem("cart");
+        navigate("/dashboard");
+      }
     } catch (error) {
       console.error(error);
-      alert(error.message || "Failed to place order");
+      alert("Something went wrong");
     } finally {
-      setPlacing(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
-      <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center text-green-700 mb-8 sm:mb-10">
-        Checkout
-      </h1>
-
-      <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-8">
-        {/* Customer Details */}
-        <div className="bg-white rounded-3xl shadow-lg p-5 sm:p-8">
-          {subscription && (
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
-              <h3 className="font-bold text-green-700 mb-2">
-                Subscription Details
-              </h3>
-              <p>Product: {subscription.product}</p>
-              <p>Quantity: {subscription.qty}</p>
-              <p>Delivery: {subscription.deliveryType}</p>
-              <p>Start Date: {subscription.startDate}</p>
-              <p>Expire Date: {subscription.expireDate}</p>
-              <p>Monthly Amount: ₹{subscription.monthlyAmount}</p>
-            </div>
-          )}
-
-          <h2 className="text-2xl font-bold mb-6">
-            Customer Details
-          </h2>
-
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={name}
-            onChange={(e) =>
-              setName(e.target.value)
-            }
-            className="w-full border rounded-xl p-4 mb-4"
-          />
-
-          <input
-            type="text"
-            value={phone}
-            readOnly
-            className="w-full border rounded-2xl px-5 py-4 bg-gray-100 cursor-not-allowed mb-4"
-          />
-
-          <textarea
-            placeholder="Delivery Address"
-            value={address}
-            onChange={(e) =>
-              setAddress(e.target.value)
-            }
-            className="w-full border rounded-xl p-4 mb-4"
-            rows="4"
-          />
-
-          <div className="mt-6">
-            <h3 className="font-semibold text-lg mb-3">
-              Payment Method
-            </h3>
-
-            <label className="flex items-center gap-3 p-3 border rounded-xl mb-3 cursor-pointer hover:bg-green-50">
-              <input
-                type="radio"
-                name="payment"
-                value="whatsapp"
-                checked={paymentMethod === "whatsapp"}
-                onChange={(e) =>
-                  setPaymentMethod(e.target.value)
-                }
-              />
-              <span>📱 WhatsApp Order</span>
-            </label>
-
-            <label className="flex items-center gap-3 p-3 border rounded-xl mb-3 cursor-pointer hover:bg-green-50">
-              <input
-                type="radio"
-                name="payment"
-                value="online"
-                checked={paymentMethod === "online"}
-                onChange={(e) =>
-                  setPaymentMethod(e.target.value)
-                }
-              />
-              <span>💳 Online Payment</span>
-            </label>
-
-            <label className="flex items-center gap-3 p-3 border rounded-xl cursor-pointer hover:bg-green-50">
-              <input
-                type="radio"
-                name="payment"
-                value="cod"
-                checked={paymentMethod === "cod"}
-                onChange={(e) =>
-                  setPaymentMethod(e.target.value)
-                }
-              />
-              <span>💵 Cash On Delivery</span>
-            </label>
-          </div>
+    <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-green-700">
+            Checkout
+          </h1>
+          <p className="text-gray-500 mt-2 text-sm sm:text-base">
+            Review your order and complete payment
+          </p>
         </div>
 
-        {/* Order Summary */}
-        <div className="bg-white rounded-3xl shadow-lg p-5 sm:p-8">
-          <h2 className="text-2xl font-bold mb-6">
-            Order Summary
-          </h2>
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* LEFT */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-3xl shadow-xl p-5 sm:p-6">
+              <h2 className="text-2xl font-bold text-green-700 mb-5">
+                Customer Details
+              </h2>
 
-          {cart.length > 0 && (
-            <>
-              {cart.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between border-b py-3"
-                >
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Customer Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full border rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-200"
+                />
+
+                <input
+                  type="text"
+                  placeholder="Phone Number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full border rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-200"
+                />
+
+                <textarea
+                  rows="4"
+                  placeholder="Address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full border rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-200"
+                />
+
+                <input
+                  type="text"
+                  placeholder="Area"
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  className="w-full border rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-200"
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl shadow-xl p-5 sm:p-6">
+              <h2 className="text-2xl font-bold mb-5">Payment Method</h2>
+
+              <div className="space-y-4">
+                <label className="flex items-start gap-3 border-2 rounded-2xl p-4 cursor-pointer hover:border-green-500">
+                  <input
+                    type="radio"
+                    value="whatsapp"
+                    checked={paymentMethod === "whatsapp"}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1"
+                  />
                   <div>
-                    <p className="font-semibold">
-                      {item.name}
-                    </p>
-                    <p className="text-gray-500 text-sm">
-                      {item.size || "1L"} × {item.qty}
+                    <h3 className="font-bold">📱 WhatsApp Order</h3>
+                    <p className="text-sm text-gray-500">
+                      Send order details on WhatsApp
                     </p>
                   </div>
+                </label>
 
-                  <span className="font-bold">
-                    ₹{Number(item.price || 0) * Number(item.qty || 0)}
-                  </span>
-                </div>
-              ))}
-            </>
-          )}
+                <label className="flex items-start gap-3 border-2 rounded-2xl p-4 cursor-pointer hover:border-green-500">
+                  <input
+                    type="radio"
+                    value="online"
+                    checked={paymentMethod === "online"}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <h3 className="font-bold">💳 Online Payment</h3>
+                    <p className="text-sm text-gray-500">
+                      Pay securely with Razorpay
+                    </p>
+                  </div>
+                </label>
 
-          {subscription && (
-            <div className="border-b py-4">
-              <p className="font-semibold text-blue-700">
-                Subscription - {subscription.product}
-              </p>
-              <p className="text-gray-500 text-sm">
-                {subscription.qty} • {subscription.deliveryType}
-              </p>
-              <p className="font-bold mt-1">
-                ₹{subscription.monthlyAmount}
-              </p>
-            </div>
-          )}
-
-          <div className="border-t mt-6 pt-6">
-            <div className="flex justify-between mb-3">
-              <span>Products Total</span>
-              <span>₹{productTotal}</span>
-            </div>
-
-            <div className="flex justify-between mb-3">
-              <span>Subscription</span>
-              <span>₹{subscriptionTotal}</span>
-            </div>
-
-            <div className="flex justify-between mb-3">
-              <span>Delivery Charges</span>
-              <span className="text-green-600">
-                Free
-              </span>
-            </div>
-
-            {paymentMethod === "online" && (
-              <div className="flex justify-between mb-3">
-                <span>GST (2%)</span>
-                <span>₹{gst}</span>
+                <label className="flex items-start gap-3 border-2 rounded-2xl p-4 cursor-pointer hover:border-green-500">
+                  <input
+                    type="radio"
+                    value="cod"
+                    checked={paymentMethod === "cod"}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <h3 className="font-bold">💵 Cash On Delivery</h3>
+                    <p className="text-sm text-gray-500">
+                      Pay during delivery
+                    </p>
+                  </div>
+                </label>
               </div>
-            )}
-
-            <div className="flex justify-between border-t pt-4 mt-4 text-2xl sm:text-3xl font-bold text-green-700">
-              <span>Grand Total</span>
-              <span>₹{grandTotal}</span>
             </div>
           </div>
 
-          <button
-            onClick={placeOrder}
-            disabled={placing || !hasAnythingToCheckout}
-            className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl text-lg font-bold shadow-lg disabled:opacity-50"
-          >
-            {placing
-              ? "Processing..."
-              : paymentMethod === "online"
-              ? `Pay ₹${grandTotal}`
-              : paymentMethod === "whatsapp"
-              ? "Send Order On WhatsApp"
-              : "Place Order"}
-          </button>
-        </div>
-      </div>
+          {/* RIGHT */}
+          <div className="bg-white rounded-3xl shadow-xl p-5 sm:p-6 h-fit">
+            <h2 className="text-2xl font-bold text-green-700 mb-5">
+              Order Summary
+            </h2>
 
-      <div className="max-w-6xl mx-auto mt-6 bg-green-50 border border-green-200 rounded-xl p-3 text-center text-sm text-green-700">
-        🚚 Fresh milk delivered daily • Secure ordering • Fast delivery
+            {cart.length === 0 ? (
+              <div className="text-center py-10">
+                <div className="text-6xl mb-4">🛒</div>
+                <h3 className="text-xl font-bold text-gray-600">
+                  Your cart is empty
+                </h3>
+                <button
+                  onClick={() => navigate("/products")}
+                  className="mt-5 bg-green-600 text-white px-6 py-3 rounded-2xl font-bold"
+                >
+                  Go To Products
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-4 max-h-[420px] overflow-auto pr-1">
+                  {cart.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex gap-3 border border-gray-100 rounded-2xl p-3"
+                    >
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-20 h-20 rounded-2xl object-cover"
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold break-words">{item.name}</h3>
+                        <p className="text-sm text-gray-500">
+                          {item.size} × {item.qty}
+                        </p>
+                        <p className="font-bold text-green-700 mt-1">
+                          ₹{Number(item.price || 0) * Number(item.qty || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-green-50 rounded-2xl p-5 mt-6">
+                  <div className="flex justify-between text-lg">
+                    <span>Total Items</span>
+                    <span className="font-semibold">{cart.length}</span>
+                  </div>
+
+                  <div className="flex justify-between text-2xl font-black text-green-700 mt-4 border-t pt-4">
+                    <span>Total</span>
+                    <span>₹{total}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handlePlaceOrder}
+                  disabled={loading}
+                  className={`w-full mt-6 py-4 rounded-2xl font-bold text-white text-lg ${
+                    loading
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-green-600 hover:bg-green-700"
+                  }`}
+                >
+                  {loading ? "Processing..." : "Place Order"}
+                </button>
+
+                <button
+                  onClick={() => navigate("/cart")}
+                  className="w-full mt-3 py-3 rounded-2xl font-bold bg-gray-100 hover:bg-gray-200 text-gray-700"
+                >
+                  Back To Cart
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

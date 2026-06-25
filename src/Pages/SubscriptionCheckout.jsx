@@ -37,9 +37,7 @@ export default function SubscriptionCheckout() {
   const customerArea = localStorage.getItem("customerArea") || "";
 
   const startDate = useMemo(
-    () =>
-      subscription.startDate ||
-      new Date().toISOString().split("T")[0],
+    () => subscription.startDate || new Date().toISOString().split("T")[0],
     [subscription]
   );
 
@@ -102,7 +100,6 @@ export default function SubscriptionCheckout() {
 
       setLoading(true);
 
-      // WhatsApp
       if (paymentMethod === "whatsapp") {
         const result = await saveSubscription();
 
@@ -137,7 +134,6 @@ Expire Date: ${expireDate}
         return;
       }
 
-      // Online Payment
       if (paymentMethod === "online") {
         if (!window.Razorpay) {
           alert("Razorpay is not loaded. Please refresh and try again.");
@@ -180,7 +176,6 @@ Expire Date: ${expireDate}
         return;
       }
 
-      // COD
       if (paymentMethod === "cod") {
         const result = await saveSubscription();
 
@@ -204,7 +199,6 @@ Expire Date: ${expireDate}
   return (
     <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
       <div className="max-w-6xl mx-auto">
-        {/* TITLE */}
         <div className="text-center mb-6 sm:mb-8">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-green-700">
             Subscription Checkout
@@ -215,9 +209,7 @@ Expire Date: ${expireDate}
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* LEFT SIDE */}
           <div className="space-y-6">
-            {/* Plan Card */}
             <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8">
               <div className="bg-gradient-to-r from-green-600 to-green-500 rounded-3xl p-6 sm:p-8 text-white">
                 <div className="text-center">
@@ -227,10 +219,7 @@ Expire Date: ${expireDate}
                     {subscription.product}
                   </h2>
 
-                  <p className="mt-3 text-base sm:text-lg">
-                    {subscription.qty}
-                  </p>
-
+                  <p className="mt-3 text-base sm:text-lg">{subscription.qty}</p>
                   <p className="text-base sm:text-lg">
                     {subscription.deliveryType}
                   </p>
@@ -244,7 +233,6 @@ Expire Date: ${expireDate}
                 </div>
               </div>
 
-              {/* Customer details */}
               <div className="bg-green-50 rounded-2xl p-4 sm:p-6 mt-6 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                   <span className="font-medium text-gray-600">Customer</span>
@@ -289,7 +277,6 @@ Expire Date: ${expireDate}
                 </div>
               </div>
 
-              {/* Features */}
               <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-6">
                 <div className="bg-green-50 rounded-2xl p-3 sm:p-4 text-center">
                   <div className="text-2xl">🚚</div>
@@ -309,7 +296,6 @@ Expire Date: ${expireDate}
             </div>
           </div>
 
-          {/* RIGHT SIDE */}
           <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 h-fit">
             <h2 className="text-2xl sm:text-3xl font-bold mb-6">
               Payment Method
@@ -365,7 +351,6 @@ Expire Date: ${expireDate}
               </label>
             </div>
 
-            {/* Summary */}
             <div className="bg-green-50 rounded-2xl p-4 sm:p-6 mt-8 space-y-3">
               <div className="flex justify-between gap-4">
                 <span>Product</span>

@@ -1,26 +1,13 @@
-import { Navigate }
-from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
-export default function ProtectedRoute({
-  children,
-}) {
-
-  const isLoggedIn =
-    localStorage.getItem(
-      "customerLogin"
-    ) === "true";
+export default function ProtectedRoute({ children }) {
+  const location = useLocation();
+  const isLoggedIn = localStorage.getItem("customerLogin") === "true";
 
   if (!isLoggedIn) {
-
-    return (
-      <Navigate
-        to="/auth"
-        replace
-      />
-    );
-
+    localStorage.setItem("redirectAfterLogin", location.pathname);
+    return <Navigate to="/auth" replace />;
   }
 
   return children;
-
 }

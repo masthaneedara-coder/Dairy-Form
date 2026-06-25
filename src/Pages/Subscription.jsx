@@ -40,22 +40,17 @@ export default function Subscription() {
 
   const getMonthlyPrice = () => {
     const pricePerLiter = getPrice();
-
     const quantityFactor = qty === "500ml" ? 0.5 : 1;
-
     const days = deliveryType === "Daily" ? 30 : 15;
-
     return pricePerLiter * quantityFactor * days;
   };
 
-  const pricePerSelectedQty =
-    qty === "500ml" ? getPrice() / 2 : getPrice();
+  const pricePerSelectedQty = qty === "500ml" ? getPrice() / 2 : getPrice();
 
   return (
     <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
       <div className="max-w-5xl mx-auto">
         <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 lg:p-10">
-          {/* TITLE */}
           <div className="text-center mb-8 sm:mb-10">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-green-700">
               🥛 Milk Subscription
@@ -110,9 +105,7 @@ export default function Subscription() {
 
           {/* QUANTITY */}
           <div className="mb-8">
-            <h2 className="text-lg sm:text-xl font-bold mb-4">
-              Quantity
-            </h2>
+            <h2 className="text-lg sm:text-xl font-bold mb-4">Quantity</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <button
@@ -229,7 +222,6 @@ export default function Subscription() {
             </div>
           </div>
 
-          {/* ACTION BUTTONS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               onClick={() => navigate("/products")}

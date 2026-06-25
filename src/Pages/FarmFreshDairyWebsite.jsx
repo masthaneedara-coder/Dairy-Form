@@ -78,10 +78,7 @@ export default function FarmFreshDairyWebsite() {
 
   const refreshCartCount = () => {
     const cart = safeCart();
-    const total = cart.reduce(
-      (sum, item) => sum + Number(item.qty || 0),
-      0
-    );
+    const total = cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
     setCartCount(total);
   };
 
@@ -139,6 +136,7 @@ export default function FarmFreshDairyWebsite() {
 
     if (!isCustomerLoggedIn) {
       localStorage.setItem("pendingCartItem", JSON.stringify(cartItem));
+      localStorage.setItem("redirectAfterLogin", "/cart");
       navigate("/auth");
       return;
     }
@@ -163,22 +161,22 @@ export default function FarmFreshDairyWebsite() {
     () => (Array.isArray(products) ? products.slice(0, 6) : []),
     [products]
   );
+
   const handleSubscriptionClick = () => {
-  const isCustomerLoggedIn =
-    localStorage.getItem("customerLogin") === "true";
+    const isCustomerLoggedIn =
+      localStorage.getItem("customerLogin") === "true";
 
-  if (!isCustomerLoggedIn) {
-    localStorage.setItem("redirectAfterLogin", "/subscription");
-    navigate("/auth");
-    return;
-  }
+    if (!isCustomerLoggedIn) {
+      localStorage.setItem("redirectAfterLogin", "/subscription");
+      navigate("/auth");
+      return;
+    }
 
-  navigate("/subscription");
-};
+    navigate("/subscription");
+  };
 
   return (
     <div className="min-h-screen bg-[#f8fff8] text-gray-800 overflow-x-hidden pb-24 lg:pb-0">
-      {/* Animations */}
       <style>{`
         @keyframes floatY {
           0%,100% { transform: translateY(0px); }
@@ -210,7 +208,6 @@ export default function FarmFreshDairyWebsite() {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20 lg:py-28">
           <div className="grid lg:grid-cols-2 gap-10 items-center">
-            {/* Left */}
             <div className="text-white animate-fadeUp">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/20 px-4 py-2 text-xs sm:text-sm font-semibold backdrop-blur-md">
                 🌿 100% Farm Fresh Milk
@@ -266,7 +263,6 @@ export default function FarmFreshDairyWebsite() {
               </div>
             </div>
 
-            {/* Right Card */}
             <div className="flex justify-center lg:justify-end animate-fadeUp">
               <div className="w-full max-w-sm rounded-[28px] bg-white/95 backdrop-blur-md shadow-2xl p-4 sm:p-5 border border-white/50">
                 <div className="rounded-[24px] bg-gradient-to-br from-green-50 to-white p-4 sm:p-5">
@@ -336,7 +332,6 @@ export default function FarmFreshDairyWebsite() {
             </div>
           </div>
 
-          {/* Stats */}
           <div className="mt-12 grid grid-cols-2 lg:grid-cols-4 gap-4">
             {stats.map((item, idx) => (
               <div
@@ -355,7 +350,7 @@ export default function FarmFreshDairyWebsite() {
         </div>
       </section>
 
-      {/* WHY CHOOSE US */}
+      {/* WHY */}
       <section className="py-14 sm:py-16 lg:py-20 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-10 sm:mb-12">
@@ -489,7 +484,7 @@ export default function FarmFreshDairyWebsite() {
         </div>
       </section>
 
-      {/* SUBSCRIPTION PLANS */}
+      {/* PLANS */}
       <section
         id="plans"
         className="py-14 sm:py-16 lg:py-20 bg-green-50 px-4 sm:px-6"
@@ -549,7 +544,7 @@ export default function FarmFreshDairyWebsite() {
                   </button>
 
                   <button
-                   onClick={handleSubscriptionClick}
+                    onClick={handleSubscriptionClick}
                     className="w-full bg-green-50 hover:bg-green-100 text-green-700 py-3.5 rounded-2xl font-bold"
                   >
                     View Subscription Page
@@ -557,124 +552,6 @@ export default function FarmFreshDairyWebsite() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* BRAND SECTION */}
-      <section className="py-14 sm:py-16 lg:py-20 px-4 sm:px-6 bg-gradient-to-b from-white to-green-50">
-        <div className="max-w-5xl mx-auto">
-          <div className="bg-white rounded-[32px] sm:rounded-[40px] lg:rounded-[50px] p-6 sm:p-10 lg:p-14 shadow-2xl border border-green-100 text-center">
-            <div className="flex justify-center">
-              <div className="w-36 h-36 sm:w-48 sm:h-48 lg:w-60 lg:h-60 rounded-full bg-green-600 flex items-center justify-center shadow-2xl overflow-hidden animate-floatY">
-                <img
-                  src={logo}
-                  alt="Farm Fresh Dairy"
-                  className="w-[90%] h-[90%] object-contain"
-                />
-              </div>
-            </div>
-
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black mt-8 text-green-800 leading-tight">
-              FARM FRESH
-            </h2>
-
-            <p className="text-base sm:text-2xl tracking-[0.2em] sm:tracking-[0.35em] text-gray-500 mt-2 sm:mt-3">
-              DAIRY MILK
-            </p>
-
-            <div className="mt-6 inline-flex items-center gap-2 bg-green-100 text-green-700 px-5 sm:px-8 py-3 rounded-full font-bold text-sm sm:text-lg shadow">
-              🌿 Premium Natural Milk Brand
-            </div>
-
-            <p className="mt-6 sm:mt-8 text-gray-600 text-sm sm:text-lg lg:text-xl leading-7 sm:leading-9 max-w-3xl mx-auto">
-              Fresh farm milk delivered daily with hygienic packaging,
-              premium quality, and natural nutrition for your family.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* MOBILE / APP SECTION */}
-      <section className="py-14 sm:py-16 lg:py-20 bg-green-600 text-white px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 items-center">
-          <div>
-            <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-tight">
-              Mobile Friendly
-              <span className="block text-green-100">
-                Milk Ordering Experience
-              </span>
-            </h2>
-
-            <p className="mt-5 sm:mt-8 text-base sm:text-xl lg:text-2xl text-green-100 leading-relaxed max-w-2xl">
-              Customers can subscribe, pause deliveries, and order milk directly
-              from mobile devices with WhatsApp support and easy checkout.
-            </p>
-
-            <div className="mt-8 space-y-3 sm:space-y-4 text-base sm:text-xl">
-              <div>✔ WhatsApp Integration</div>
-              <div>✔ QR / Online Payment Support</div>
-              <div>✔ Delivery Notifications</div>
-              <div>✔ Subscription Dashboard</div>
-            </div>
-
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => navigate("/products")}
-                className="bg-white text-green-700 hover:bg-green-50 px-6 py-3 rounded-2xl font-bold"
-              >
-                Order Products
-              </button>
-
-              <button
-               onClick={handleSubscriptionClick}
-                className="bg-black/20 border border-white/20 hover:bg-black/30 px-6 py-3 rounded-2xl font-bold"
-              >
-                Start Subscription
-              </button>
-            </div>
-          </div>
-
-          <div className="flex justify-center">
-            <div className="w-full max-w-xs sm:max-w-sm bg-white rounded-[34px] sm:rounded-[40px] p-4 shadow-2xl text-black">
-              <div className="rounded-[28px] sm:rounded-[32px] overflow-hidden bg-gray-100">
-                <div className="bg-green-600 text-white p-4 sm:p-5 text-center font-bold text-lg sm:text-2xl">
-                  Farm Fresh Dairy
-                </div>
-
-                <div className="p-4 sm:p-5 space-y-4">
-                  <div className="bg-white rounded-2xl p-4 shadow-sm flex justify-between gap-3">
-                    <div>
-                      <div className="font-bold">Cow Milk</div>
-                      <div className="text-gray-500 text-sm">1L Daily</div>
-                    </div>
-                    <div className="text-green-600 font-bold">₹60</div>
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-4 shadow-sm flex justify-between gap-3">
-                    <div>
-                      <div className="font-bold">Buffalo Milk</div>
-                      <div className="text-gray-500 text-sm">1L Daily</div>
-                    </div>
-                    <div className="text-green-600 font-bold">₹80</div>
-                  </div>
-
-                  <button
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold"
-                    onClick={handleSubscriptionClick}
-                  >
-                    Subscribe Now
-                  </button>
-
-                  <button
-                    className="w-full bg-green-50 hover:bg-green-100 text-green-700 py-3.5 rounded-2xl font-bold"
-                    onClick={() => navigate("/products")}
-                  >
-                    Shop Products
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -755,7 +632,6 @@ export default function FarmFreshDairyWebsite() {
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer className="bg-green-950 text-white px-4 sm:px-6 py-10">
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-3 gap-8">
@@ -835,7 +711,6 @@ export default function FarmFreshDairyWebsite() {
         </div>
       </footer>
 
-      {/* FLOATING CART BUTTON */}
       <button
         onClick={() => navigate("/cart")}
         className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-green-600 hover:bg-green-700 text-white shadow-2xl flex items-center justify-center text-2xl animate-glow"
@@ -848,7 +723,6 @@ export default function FarmFreshDairyWebsite() {
         )}
       </button>
 
-      {/* MOBILE BOTTOM CTA */}
       <div className="fixed bottom-0 inset-x-0 z-30 lg:hidden border-t border-green-100 bg-white/95 backdrop-blur-xl shadow-[0_-10px_30px_rgba(0,0,0,0.08)]">
         <div className="grid grid-cols-3 gap-2 p-3">
           <button
