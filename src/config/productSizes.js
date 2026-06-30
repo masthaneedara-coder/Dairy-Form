@@ -38,4 +38,19 @@ export const PRODUCT_SIZES = {
     { label: "500 g", multiplier: 0.5 },
     { label: "1 kg", multiplier: 1 },
   ],
+  "Pista": [
+   
+    { label: "500 g", multiplier: 0.5 },
+    { label: "1 kg", multiplier: 1 },
+  ],
+  "Raw Rise": [
+    
+    { label: "25 kg", multiplier: 1 },
+  ],
+  "Badam": [
+    
+    { label: "500 g", multiplier: 0.5 },
+    { label: "1 kg", multiplier: 1 },
+  ],
+
 };

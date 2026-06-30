@@ -44,23 +44,71 @@ export default function Checkout() {
     setPhone(getCustomerPhone());
   }, [navigate]);
 
-  const total = useMemo(() => getCartTotal(), [cart]);
+  const subtotal = useMemo(() => getCartTotal(), [cart]);
 
-  const totalItems = useMemo(
-    () => cart.reduce((sum, item) => sum + Number(item.qty || 0), 0),
-    [cart]
-  );
+    const gst = useMemo(() => {
+      return paymentMethod === PAYMENT_METHODS.ONLINE
+        ? +(subtotal * 0.02).toFixed(2)
+        : 0;
+    }, [subtotal, paymentMethod]);
 
-  const handlePlaceOrder = async () => {
+    const total = useMemo(() => {
+      return +(subtotal + gst).toFixed(2);
+    }, [subtotal, gst]);
+    const totalItems = useMemo(() => {
+  return cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+}, [cart]);
+
+    const openRazorpay = () => {
+  const options = {
+    key: "rzp_live_SryV51ja9BVho8",
+
+    amount: Math.round(total * 100),
+
+    currency: "INR",
+
+    name: "Farm Fresh Dairy",
+
+    description: "Milk & Grocery Order",
+
+    image: "/logo.png",
+
+    handler: function (response) {
+      alert("Payment Successful");
+
+      console.log(response);
+
+      handlePlaceOrder(response.razorpay_payment_id);
+    },
+
+    theme: {
+      color: "#16a34a",
+    },
+  };
+
+  const razor = new window.Razorpay(options);
+
+  razor.open();
+};
+
+  const handlePlaceOrder = async (paymentId = "") => {
     if (!customerName || !phone || !address) {
       alert("Please fill customer name, phone and address");
       return;
+    }
+    if (typeof paymentId !== "string") {
+    paymentId = "";
     }
 
     if (!cart.length) {
       alert("Cart is empty");
       return;
     }
+    if (paymentMethod === PAYMENT_METHODS.ONLINE && !paymentId) {
+        setLoading(false);
+        openRazorpay();
+        return;
+      }
 
     try {
       setLoading(true);
@@ -77,8 +125,16 @@ export default function Checkout() {
           price: item.price,
           size: item.size,
         })),
-        totalAmount: total,
-      };
+        subtotal,
+          gst,
+          totalAmount: total,
+          paymentId,
+          paymentStatus:
+            paymentMethod === PAYMENT_METHODS.ONLINE
+              ? (paymentId ? "Paid" : "Pending")
+              : "Pending",
+
+                };
 
       const result = await placeOrder(payload);
 
@@ -129,6 +185,7 @@ export default function Checkout() {
       setLoading(false);
     }
   };
+  
   
 
    
@@ -298,6 +355,18 @@ export default function Checkout() {
               </div>
 
               <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>₹{subtotal.toFixed(2)}</span>
+              </div>
+
+              {paymentMethod === PAYMENT_METHODS.ONLINE && (
+                <div className="flex justify-between text-orange-600">
+                  <span>GST (2%)</span>
+                  <span>₹{gst.toFixed(2)}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between">
                 <span>Delivery</span>
                 <span className="font-semibold text-green-600">Free</span>
               </div>
@@ -306,12 +375,14 @@ export default function Checkout() {
 
               <div className="flex justify-between text-2xl font-black text-green-700">
                 <span>Total</span>
-                <span>₹{total}</span>
+                <span>₹{total.toFixed(2)}</span>
               </div>
+
+              <hr />              
             </div>
 
             <button
-              onClick={handlePlaceOrder}
+              onClick={() => handlePlaceOrder()}
               disabled={loading || cart.length === 0}
               className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold disabled:bg-gray-400"
             >

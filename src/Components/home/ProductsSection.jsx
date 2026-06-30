@@ -44,11 +44,6 @@ export default function ProductsSection({
             <h4 className="text-2xl font-black text-green-700">
               No products found
             </h4>
-
-            <p className="text-gray-500 mt-2">
-              No products available in this category.
-            </p>
-
           </div>
 
         ) : (

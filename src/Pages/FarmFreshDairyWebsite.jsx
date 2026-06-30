@@ -50,6 +50,8 @@ export default function FarmFreshDairyWebsite() {
     const loadProducts = async () => {
       try {
         const data = await fetchProducts();
+        console.log("Products:", data);
+        setProducts(data);
         const list = Array.isArray(data)
           ? data
           : Array.isArray(data?.products)
