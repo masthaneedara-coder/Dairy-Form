@@ -36,8 +36,8 @@ import DeliveryOrders from "./Pages/DeliveryOrders";
 import DeliveryProtectedRoute from "./Components/DeliveryProtectedRoute";
 
 /* Notification */
-import Notifications from "./pages/Notifications";
-import NotificationSettings from "./pages/NotificationSettings";
+import Notifications from "./Pages/Notifications";
+import NotificationSettings from "./Pages/NotificationSettings";
 
 export default function App() {
   return (
