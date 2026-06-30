@@ -1,112 +1,102 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function DeliveryLogin() {
   const navigate = useNavigate();
 
-  const [selectedBoy, setSelectedBoy] = useState("Ravi");
+  const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const deliveryBoys = [
-    "Ravi",
-    "Suresh",
-    "Mahesh",
-    "Ramu"
-  ];
-
-  useEffect(() => {
-    const isDeliveryLoggedIn =
-      localStorage.getItem("deliveryLogin") === "true";
-
-    const userRole = localStorage.getItem("userRole");
-
-    if (isDeliveryLoggedIn && userRole === "delivery") {
-      navigate("/delivery-boy");
-    }
-  }, [navigate]);
-
-  const handleDeliveryLogin = (e) => {
-    e.preventDefault();
-
-    // Simple demo password for all delivery boys
-    const deliveryPassword = "123456";
-
-    if (!selectedBoy) {
-      alert("Please select delivery boy");
+  const handleDeliveryLogin = async () => {
+    if (!mobile || !password) {
+      alert("Please enter mobile number and password");
       return;
     }
 
-    if (password !== deliveryPassword) {
-      alert("Invalid password");
-      return;
+    try {
+      setLoading(true);
+
+      // Temporary static delivery login
+      if (mobile === "8888888888" && password === "delivery123") {
+        localStorage.setItem("deliveryLogin", "true");
+        localStorage.setItem("deliveryBoyName", "Delivery Boy");
+        localStorage.setItem("deliveryBoyPhone", mobile);
+        localStorage.setItem("userRole", "delivery");
+
+        navigate("/delivery");
+      } else {
+        alert("Invalid delivery login credentials");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Delivery login failed");
+    } finally {
+      setLoading(false);
     }
-
-    // Clear any previous login
-    localStorage.removeItem("customerLogin");
-    localStorage.removeItem("customerName");
-    localStorage.removeItem("customerPhone");
-    localStorage.removeItem("adminLogin");
-    localStorage.removeItem("adminName");
-
-    // Set delivery login
-    localStorage.setItem("deliveryLogin", "true");
-    localStorage.setItem("userRole", "delivery");
-    localStorage.setItem("deliveryBoyName", selectedBoy);
-
-    navigate("/delivery-boy");
   };
 
   return (
-    <div className="min-h-screen bg-orange-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8">
-        <h1 className="text-4xl font-black text-center text-orange-700 mb-2">
-          Delivery Login
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 px-3 sm:px-4 md:px-6 py-6 flex items-center justify-center">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-5 sm:p-6 md:p-8 border border-orange-100">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center text-4xl shadow-xl">
+            🚚
+          </div>
 
-        <p className="text-center text-gray-500 mb-8">
-          Farm Fresh Dairy Delivery Panel
-        </p>
+          <h1 className="mt-4 text-3xl sm:text-4xl font-black text-orange-700">
+            Delivery Login
+          </h1>
 
-        <form onSubmit={handleDeliveryLogin} className="space-y-5">
+          <p className="text-gray-500 mt-2 text-sm sm:text-base">
+            Sign in to view assigned orders and update delivery status
+          </p>
+        </div>
+
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
-              Select Delivery Boy
+            <label className="block text-left text-sm font-semibold text-gray-700 mb-2">
+              Mobile Number
             </label>
-
-            <select
-              value={selectedBoy}
-              onChange={(e) => setSelectedBoy(e.target.value)}
-              className="w-full border rounded-2xl px-4 py-3"
-            >
-              {deliveryBoys.map((boy) => (
-                <option key={boy} value={boy}>
-                  {boy}
-                </option>
-              ))}
-            </select>
+            <input
+              type="text"
+              placeholder="Enter delivery mobile"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:border-orange-500"
+            />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">
+            <label className="block text-left text-sm font-semibold text-gray-700 mb-2">
               Password
             </label>
-
             <input
               type="password"
-              placeholder="Enter password"
+              placeholder="Enter delivery password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full border rounded-2xl px-4 py-3"
+              className="w-full border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:border-orange-500"
             />
           </div>
 
           <button
-            type="submit"
-            className="w-full bg-orange-600 text-white py-3 rounded-2xl font-bold hover:bg-orange-700"
+            onClick={handleDeliveryLogin}
+            disabled={loading}
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-3.5 rounded-2xl font-bold shadow-lg disabled:opacity-60"
           >
-            Login
+            {loading ? "Logging in..." : "Login as Delivery"}
           </button>
-        </form>
+
+          <Link
+            to="/"
+            className="block w-full text-center bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-2xl font-semibold"
+          >
+            ← Back to Home
+          </Link>
+        </div>
+
+        
       </div>
     </div>
   );

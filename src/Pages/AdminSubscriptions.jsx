@@ -1,18 +1,109 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import AdminLayout from "../Components/AdminLayout";
+import {
+  fetchAllSubscriptions,
+  updateSubscriptionStatus,
+} from "../config/api";
 
 export default function AdminSubscriptions() {
-  const SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbxrawDo75QKP1RwDwjjAKwoE0-so9UdTG2V4Dpq94PF8KOrMNx4CpfBEuNlk7VvblII/exec";
-
+  
   const [subscriptions, setSubscriptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState("");
-  const [actionLoading, setActionLoading] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
+  const loadSubscriptions = async () => {
+  try {
+    setLoading(true);
 
-    const date = new Date(dateString);
-    if (isNaN(date)) return dateString;
+    const data = await fetchAllSubscriptions();
+
+    const list = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.subscriptions)
+      ? data.subscriptions
+      : [];
+
+    setSubscriptions(list);
+  } catch (error) {
+    console.error("Failed to load subscriptions:", error);
+    setSubscriptions([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  useEffect(() => {
+    loadSubscriptions();
+  }, []);
+
+  const filteredSubscriptions = useMemo(() => {
+    const q = search.toLowerCase().trim();
+
+    return subscriptions.filter((sub) => {
+      const customerName = String(sub.customerName || sub.name || "").toLowerCase();
+      const phone = String(sub.phone || sub.mobile || "").toLowerCase();
+      const product = String(sub.product || sub.planName || "").toLowerCase();
+      const status = String(sub.status || "Active").toLowerCase();
+
+      const matchesSearch =
+        !q ||
+        customerName.includes(q) ||
+        phone.includes(q) ||
+        product.includes(q);
+
+      const matchesStatus =
+        statusFilter === "All" ||
+        status === statusFilter.toLowerCase();
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [subscriptions, search, statusFilter]);
+
+  const stats = useMemo(() => {
+    const total = subscriptions.length;
+    const active = subscriptions.filter(
+      (s) => String(s.status || "Active").toLowerCase() === "active"
+    ).length;
+    const paused = subscriptions.filter(
+      (s) => String(s.status || "").toLowerCase() === "paused"
+    ).length;
+    const stopped = subscriptions.filter(
+      (s) =>
+        String(s.status || "").toLowerCase() === "stopped" ||
+        String(s.status || "").toLowerCase() === "expired"
+    ).length;
+
+    const monthlyRevenue = subscriptions.reduce((sum, sub) => {
+      const status = String(sub.status || "Active").toLowerCase();
+      if (status !== "active") return sum;
+
+      return (
+        sum +
+        Number(
+          sub.monthlyAmount ||
+            sub.price ||
+            sub.amount ||
+            0
+        )
+      );
+    }, 0);
+
+    return {
+      total,
+      active,
+      paused,
+      stopped,
+      monthlyRevenue,
+    };
+  }, [subscriptions]);
+
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "-";
+
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return dateValue;
 
     return date.toLocaleDateString("en-IN", {
       day: "2-digit",
@@ -21,309 +112,367 @@ export default function AdminSubscriptions() {
     });
   };
 
-  const getSubscriptionStatus = (sub) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (sub.status === "Paused") {
-      return "Paused";
-    }
-
-    const expiry = new Date(sub.expireDate);
-    if (!isNaN(expiry)) {
-      expiry.setHours(0, 0, 0, 0);
-      if (expiry < today) {
-        return "Expired";
-      }
-    }
-
-    return "Active";
+  const formatMoney = (value) => {
+    const num = Number(value || 0);
+    if (Number.isNaN(num)) return "₹0";
+    return `₹${num.toLocaleString("en-IN")}`;
   };
 
-  const loadSubscriptions = async () => {
-    try {
-      const res = await fetch(
-        `${SCRIPT_URL}?action=subscriptions`
+  const getStatusStyle = (status) => {
+    const s = String(status || "").toLowerCase();
+
+    if (s === "active") {
+      return {
+        badge: "bg-green-100 text-green-700 border border-green-200",
+        dot: "bg-green-500",
+      };
+    }
+
+    if (s === "paused") {
+      return {
+        badge: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+        dot: "bg-yellow-500",
+      };
+    }
+
+    if (s === "stopped" || s === "expired") {
+      return {
+        badge: "bg-red-100 text-red-700 border border-red-200",
+        dot: "bg-red-500",
+      };
+    }
+
+    return {
+      badge: "bg-orange-100 text-orange-700 border border-orange-200",
+      dot: "bg-orange-500",
+    };
+  };
+
+  const updateStatusLocal = async (subscriptionId, newStatus) => {
+  try {
+    const res = await updateSubscriptionStatus(
+      subscriptionId,
+      newStatus
+    );
+
+    if (res.success) {
+      setSubscriptions((prev) =>
+        prev.map((sub) =>
+          String(sub.subscriptionId || sub.id) ===
+          String(subscriptionId)
+            ? { ...sub, status: newStatus }
+            : sub
+        )
       );
-      const data = await res.json();
-
-      const updatedData = Array.isArray(data)
-        ? data.map((sub) => ({
-            ...sub,
-            computedStatus: getSubscriptionStatus(sub),
-          }))
-        : [];
-
-      setSubscriptions(updatedData);
-    } catch (error) {
-      console.error("Failed to load subscriptions:", error);
+    } else {
+      alert(res.message);
     }
-  };
-
-  useEffect(() => {
-    loadSubscriptions();
-  }, []);
-
-  const updateStatus = async (subscriptionId, status) => {
-    try {
-      setActionLoading(subscriptionId);
-
-      await fetch(SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8",
-        },
-        body: JSON.stringify({
-          action: "updateSubscriptionStatus",
-          subscriptionId,
-          status,
-        }),
-      });
-
-      alert(`Subscription ${status} request sent`);
-
-      // wait for Apps Script to update Google Sheet
-      setTimeout(() => {
-        loadSubscriptions();
-        setActionLoading("");
-      }, 2000);
-    } catch (error) {
-      console.error("Failed to update status:", error);
-      setActionLoading("");
-      alert("Failed to update subscription status");
-    }
-  };
-
-  const renewSubscription = async (subscriptionId) => {
-    try {
-      setActionLoading(subscriptionId);
-
-      await fetch(SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8",
-        },
-        body: JSON.stringify({
-          action: "renewSubscription",
-          subscriptionId,
-        }),
-      });
-
-      alert("Renew request sent");
-
-      setTimeout(() => {
-        loadSubscriptions();
-        setActionLoading("");
-      }, 2000);
-    } catch (error) {
-      console.error("Failed to renew subscription:", error);
-      setActionLoading("");
-      alert("Failed to renew subscription");
-    }
-  };
-
-  const filtered = subscriptions.filter((sub) =>
-    (sub.customerName || "")
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
-
-  const totalRevenue = subscriptions.reduce(
-    (sum, sub) => sum + Number(sub.price || 0),
-    0
-  );
-
-  const activeCount = subscriptions.filter(
-    (s) => s.computedStatus === "Active"
-  ).length;
-
-  const pausedCount = subscriptions.filter(
-    (s) => s.computedStatus === "Paused"
-  ).length;
-
-  const expiredCount = subscriptions.filter(
-    (s) => s.computedStatus === "Expired"
-  ).length;
+  } catch (err) {
+    console.error(err);
+    alert("Unable to update subscription");
+  }
+};
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6">
-      <h1 className="text-5xl font-black text-green-700 mb-8">
-        Subscription Management
-      </h1>
+    <AdminLayout title="Subscriptions">
+      <div className="space-y-5 sm:space-y-6">
+        {/* HERO */}
+        <div className="rounded-[26px] sm:rounded-[30px] bg-gradient-to-r from-green-700 via-emerald-600 to-green-700 p-4 sm:p-6 text-white shadow-xl">
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-white/80 text-xs sm:text-sm">
+                Admin Subscription Control
+              </p>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black mt-1">
+                🔁 Subscriptions Management
+              </h1>
+              <p className="text-white/90 mt-2 text-sm sm:text-base">
+                View active plans, manage customer subscriptions and update status.
+              </p>
+            </div>
 
-      {/* CARDS */}
-      <div className="grid md:grid-cols-5 gap-6 mb-8">
-        <div className="bg-white rounded-3xl p-6 shadow-lg text-center">
-          <p className="text-gray-600 font-semibold">Total Plans</p>
-          <h2 className="text-4xl font-black text-green-600">
-            {subscriptions.length}
-          </h2>
+            <div className="grid grid-cols-2 sm:flex gap-3">
+              <button
+                onClick={loadSubscriptions}
+                className="px-4 py-3 rounded-2xl bg-white text-green-700 font-bold shadow text-sm sm:text-base"
+              >
+                Refresh Subscriptions
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 shadow-lg text-center">
-          <p className="text-gray-600 font-semibold">Active</p>
-          <h2 className="text-4xl font-black text-blue-600">
-            {activeCount}
-          </h2>
+        {/* STATS */}
+        <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4">
+          <StatCard title="Total" value={stats.total} color="green" icon="🔁" />
+          <StatCard title="Active" value={stats.active} color="emerald" icon="✅" />
+          <StatCard title="Paused" value={stats.paused} color="yellow" icon="⏸️" />
+          <StatCard title="Stopped" value={stats.stopped} color="red" icon="⛔" />
+          <StatCard
+            title="Monthly Revenue"
+            value={formatMoney(stats.monthlyRevenue)}
+            color="blue"
+            icon="💰"
+          />
         </div>
 
-        <div className="bg-white rounded-3xl p-6 shadow-lg text-center">
-          <p className="text-gray-600 font-semibold">Paused</p>
-          <h2 className="text-4xl font-black text-orange-600">
-            {pausedCount}
-          </h2>
+        {/* FILTERS */}
+        <div className="bg-white rounded-3xl shadow-lg border border-slate-100 p-4 sm:p-5">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px_auto] gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Search Subscription
+              </label>
+              <input
+                type="text"
+                placeholder="Search by customer / phone / product"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              >
+                <option value="All">All</option>
+                <option value="Active">Active</option>
+                <option value="Paused">Paused</option>
+                <option value="Stopped">Stopped</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                onClick={loadSubscriptions}
+                className="w-full lg:w-auto bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-2xl font-bold shadow"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 shadow-lg text-center">
-          <p className="text-gray-600 font-semibold">Expired</p>
-          <h2 className="text-4xl font-black text-red-600">
-            {expiredCount}
-          </h2>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 shadow-lg text-center">
-          <p className="text-gray-600 font-semibold">
-            Monthly Revenue
-          </p>
-          <h2 className="text-4xl font-black text-purple-600">
-            ₹{totalRevenue}
-          </h2>
-        </div>
-      </div>
-
-      {/* SEARCH */}
-      <input
-        placeholder="Search Customer..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full border rounded-xl p-4 mb-6"
-      />
-
-      {/* TABLE */}
-      <div className="bg-white rounded-3xl shadow-xl p-6 overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-green-50 text-left">
-              <th className="p-4">Customer</th>
-              <th className="p-4">Product</th>
-              <th className="p-4">Qty</th>
-              <th className="p-4">Monthly Bill</th>
-              <th className="p-4">Start</th>
-              <th className="p-4">Expiry</th>
-              <th className="p-4">Status</th>
-              <th className="p-4">Action</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filtered.map((sub) => {
-              const status = sub.computedStatus;
-              const isLoading =
-                actionLoading === sub.subscriptionId;
+        {/* CONTENT */}
+        {loading ? (
+          <div className="bg-slate-50 rounded-3xl p-10 text-center">
+            <div className="text-5xl mb-3 animate-pulse">⏳</div>
+            <p className="text-lg font-semibold text-slate-600">
+              Loading subscriptions...
+            </p>
+          </div>
+        ) : filteredSubscriptions.length === 0 ? (
+          <div className="bg-white rounded-3xl shadow-lg border border-slate-100 p-10 text-center">
+            <div className="text-6xl mb-4">🔁</div>
+            <h2 className="text-2xl font-black text-slate-700">
+              No subscriptions found
+            </h2>
+            <p className="text-slate-500 mt-2">
+              Try changing search or status filter.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {filteredSubscriptions.map((sub, index) => {
+              const statusStyle = getStatusStyle(sub.status || "Active");
+              const subscriptionId = sub.subscriptionId || sub.id || `SUB-${index + 1}`;
+              const monthlyAmount =
+                sub.monthlyAmount || sub.price || sub.amount || 0;
 
               return (
-                <tr
-                  key={sub.subscriptionId}
-                  className="border-b"
+                <div
+                  key={subscriptionId}
+                  className="bg-white rounded-3xl shadow-md border border-slate-100 p-4 sm:p-5 hover:shadow-xl transition"
                 >
-                  <td className="p-4 font-medium">
-                    {sub.customerName}
-                  </td>
+                  <div className="flex flex-col gap-4">
+                    {/* TOP */}
+                    <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h2 className="text-lg sm:text-2xl font-black text-green-700 break-words">
+                            {sub.customerName || sub.name || "Customer"}
+                          </h2>
 
-                  <td className="p-4">{sub.product}</td>
+                          <span
+                            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${statusStyle.badge}`}
+                          >
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full ${statusStyle.dot}`}
+                            ></span>
+                            {sub.status || "Active"}
+                          </span>
+                        </div>
 
-                  <td className="p-4">{sub.qty}</td>
+                        <p className="text-sm text-slate-500 mt-2 break-all">
+                          Subscription ID: {subscriptionId}
+                        </p>
+                      </div>
 
-                  <td className="p-4 font-bold text-green-600">
-                    ₹{sub.price}
-                  </td>
+                      <div className="rounded-2xl bg-gradient-to-r from-green-600 to-emerald-600 text-white px-5 py-4 shadow w-full sm:w-auto">
+                        <p className="text-xs sm:text-sm text-white/80">
+                          Monthly Amount
+                        </p>
+                        <h3 className="text-2xl font-black mt-1">
+                          {formatMoney(monthlyAmount)}
+                        </h3>
+                      </div>
+                    </div>
 
-                  <td className="p-4">
-                    {formatDate(sub.startDate)}
-                  </td>
+                    {/* CUSTOMER + PLAN INFO */}
+                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                      <InfoBox label="Phone" value={sub.phone || sub.mobile || "-"} />
+                      <InfoBox label="Product" value={sub.product || "-"} />
+                      <InfoBox label="Quantity" value={sub.qty || "-"} />
+                      <InfoBox label="Delivery" value={sub.deliveryType || "-"} />
+                    </div>
 
-                  <td className="p-4">
-                    {formatDate(sub.expireDate)}
-                  </td>
+                    {/* ADDRESS */}
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm text-slate-500 font-medium">Address</p>
+                      <p className="text-slate-800 font-semibold mt-1 break-words">
+                        {sub.address || "-"}
+                      </p>
+                    </div>
 
-                  <td className="p-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-white font-semibold ${
-                        status === "Active"
-                          ? "bg-green-500"
-                          : status === "Paused"
-                          ? "bg-orange-500"
-                          : "bg-red-500"
-                      }`}
-                    >
-                      {status}
-                    </span>
-                  </td>
+                    {/* DATES */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <InfoBox
+                        label="Start Date"
+                        value={formatDate(sub.startDate || sub.date)}
+                      />
+                      <InfoBox
+                        label="Expire Date"
+                        value={formatDate(sub.expireDate || sub.endDate)}
+                      />
+                      <InfoBox label="Area" value={sub.area || "-"} />
+                    </div>
 
-                  <td className="p-4">
-                    {status === "Active" && (
-                      <button
-                        disabled={isLoading}
-                        onClick={() =>
-                          updateStatus(
-                            sub.subscriptionId,
-                            "Paused"
-                          )
-                        }
-                        className="px-4 py-2 rounded-xl text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
-                      >
-                        {isLoading ? "Updating..." : "Pause"}
-                      </button>
-                    )}
+                    {/* SUMMARY + ACTIONS */}
+                    <div className="grid xl:grid-cols-[1fr_360px] gap-4">
+                      <div className="rounded-3xl border border-green-100 bg-green-50 p-4 sm:p-5">
+                        <h3 className="text-lg sm:text-xl font-black text-green-700">
+                          Subscription Summary
+                        </h3>
+                        <div className="grid sm:grid-cols-2 gap-3 mt-4">
+                          <div className="rounded-2xl bg-white border border-green-100 p-4">
+                            <p className="text-sm text-slate-500">Plan</p>
+                            <p className="font-black text-slate-800 mt-1 break-words">
+                              {sub.product || "-"}
+                            </p>
+                          </div>
 
-                    {status === "Paused" && (
-                      <button
-                        disabled={isLoading}
-                        onClick={() =>
-                          updateStatus(
-                            sub.subscriptionId,
-                            "Active"
-                          )
-                        }
-                        className="px-4 py-2 rounded-xl text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                      >
-                        {isLoading ? "Updating..." : "Resume"}
-                      </button>
-                    )}
+                          <div className="rounded-2xl bg-white border border-green-100 p-4">
+                            <p className="text-sm text-slate-500">Delivery Type</p>
+                            <p className="font-black text-slate-800 mt-1 break-words">
+                              {sub.deliveryType || "-"}
+                            </p>
+                          </div>
 
-                    {status === "Expired" && (
-                      <button
-                        disabled={isLoading}
-                        onClick={() =>
-                          renewSubscription(
-                            sub.subscriptionId
-                          )
-                        }
-                        className="px-4 py-2 rounded-xl text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {isLoading ? "Updating..." : "Renew"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                          <div className="rounded-2xl bg-white border border-green-100 p-4">
+                            <p className="text-sm text-slate-500">Quantity</p>
+                            <p className="font-black text-slate-800 mt-1">
+                              {sub.qty || "-"}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl bg-white border border-green-100 p-4">
+                            <p className="text-sm text-slate-500">Monthly Fee</p>
+                            <p className="font-black text-green-700 mt-1">
+                              {formatMoney(monthlyAmount)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
+                        <h3 className="text-lg font-black text-slate-800">
+                          Update Subscription Status
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-1">
+                          Pause, activate or stop this customer plan
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3 mt-4">
+                          <button
+                            onClick={() =>
+                              updateStatusLocal(subscriptionId, "Active")
+                            }
+                            className="bg-green-600 hover:bg-green-700 text-white py-3 rounded-2xl font-semibold text-sm"
+                          >
+                            Activate
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              updateStatusLocal(subscriptionId, "Paused")
+                            }
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-2xl font-semibold text-sm"
+                          >
+                            Pause
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              updateStatusLocal(subscriptionId, "Stopped")
+                            }
+                            className="bg-red-500 hover:bg-red-600 text-white py-3 rounded-2xl font-semibold text-sm"
+                          >
+                            Stop
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               );
             })}
-
-            {filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan="8"
-                  className="p-6 text-center text-gray-500"
-                >
-                  No subscriptions found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+          </div>
+        )}
       </div>
+    </AdminLayout>
+  );
+}
+
+function StatCard({ title, value, color = "green", icon = "🔁" }) {
+  const styles = {
+    green: "border-green-100 text-green-700 bg-white",
+    emerald: "border-emerald-100 text-emerald-700 bg-white",
+    yellow: "border-yellow-100 text-yellow-700 bg-white",
+    red: "border-red-100 text-red-700 bg-white",
+    blue: "border-blue-100 text-blue-700 bg-white",
+  };
+
+  return (
+    <div
+      className={`rounded-3xl p-4 sm:p-5 shadow-lg border ${styles[color] || styles.green}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-slate-500 text-xs sm:text-sm">{title}</p>
+          <h3 className="text-xl sm:text-3xl font-black mt-2 break-words">
+            {value}
+          </h3>
+        </div>
+        <div className="text-2xl sm:text-3xl shrink-0">{icon}</div>
+      </div>
+    </div>
+  );
+}
+
+function InfoBox({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 min-w-0">
+      <p className="text-xs sm:text-sm text-slate-500 font-medium">{label}</p>
+      <h3 className="text-sm sm:text-lg font-black text-slate-800 mt-1 break-words">
+        {value}
+      </h3>
     </div>
   );
 }

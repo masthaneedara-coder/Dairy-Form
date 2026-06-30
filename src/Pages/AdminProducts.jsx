@@ -1,376 +1,649 @@
+import { useEffect, useMemo, useState } from "react";
+import AdminLayout from "../Components/AdminLayout";
 import {
-  useEffect,
-  useState
-} from "react";
+   fetchProducts,
+  addProduct,
+  updateProduct,
+  deleteProduct,
+} from "../config/api";
+
+
+const EMPTY_PRODUCT = {
+  id: "",
+  name: "",
+  price: "",
+  stock: "",
+  image: "",
+  category: "",
+};
+
+const DEFAULT_IMAGE =
+  "https://script.google.com/macros/s/AKfycbwLKt8d5VcS_uGmzk7t16EdgE7Qpx4crtitjxC6QWyJLde3RWtJuwRvIWWX3bXIM9UM/exec";
 
 export default function AdminProducts() {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbxrawDo75QKP1RwDwjjAKwoE0-so9UdTG2V4Dpq94PF8KOrMNx4CpfBEuNlk7VvblII/exec";
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [stockFilter, setStockFilter] = useState("All");
 
-  const [products, setProducts] =
-    useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
-  const [name, setName] =
-    useState("");
+  const [newProduct, setNewProduct] = useState(EMPTY_PRODUCT);
+  const [editingProduct, setEditingProduct] = useState(null);
 
-  const [price, setPrice] =
-    useState("");
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchProducts();
 
-  const [stock, setStock] =
-    useState("");
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.products)
+        ? data.products
+        : [];
 
-  const [image, setImage] =
-    useState("");
-
-  const loadProducts =
-    async () => {
-
-      const res =
-        await fetch(
-          `${SCRIPT_URL}?action=products`
-        );
-
-      const data =
-        await res.json();
-
-      setProducts(data);
-
-    };
+      setProducts(list);
+    } catch (error) {
+      console.error("Products fetch failed:", error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-
     loadProducts();
-
   }, []);
 
- const addProduct = async () => {
+  const categories = useMemo(() => {
+    const list = products
+      .map((p) => String(p.category || "").trim())
+      .filter(Boolean);
 
-  if (!name || !price || !stock) {
-    alert("Please fill all fields");
-    return;
-  }
+    return ["All", ...new Set(list)];
+  }, [products]);
 
-  try {
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const name = String(product.name || "").toLowerCase();
+      const category = String(product.category || "");
+      const stock = Number(product.stock || 0);
 
-    await fetch(SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8",
-      },
-      body: JSON.stringify({
-        action: "addProduct",
-        name,
-        price: Number(price),
-        stock: Number(stock),
-        image,
-      }),
+      const matchesSearch =
+        !search.trim() || name.includes(search.trim().toLowerCase());
+
+      const matchesCategory =
+        categoryFilter === "All" || category === categoryFilter;
+
+      const matchesStock =
+        stockFilter === "All" ||
+        (stockFilter === "In Stock" && stock > 5) ||
+        (stockFilter === "Low Stock" && stock > 0 && stock <= 5) ||
+        (stockFilter === "Out Of Stock" && stock === 0);
+
+      return matchesSearch && matchesCategory && matchesStock;
     });
+  }, [products, search, categoryFilter, stockFilter]);
 
-    alert("Product Added");
-
-    setName("");
-    setPrice("");
-    setStock("");
-    setImage("");
-
-    setTimeout(loadProducts, 1500);
-
-  } catch (err) {
-
-    console.error(err);
-    alert("Failed to add product");
-
-  }
-
-};
-const deleteProduct = async (
-  productName
-) => {
-
-  if (
-    !window.confirm(
-      `Delete ${productName}?`
-    )
-  ) {
-    return;
-  }
-
-  try {
-
-    await fetch(SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type":
-          "text/plain;charset=utf-8",
-      },
-      body: JSON.stringify({
-        action: "deleteProduct",
-        productName,
-      }),
-    });
-
-    setTimeout(loadProducts, 1000);
-
-  } catch (err) {
-
-    console.log(err);
-
-  }
-
-};
-const updateStock = async (
-  productName,
-  change
-) => {
-
-  const product =
-    products.find(
-      (p) => p.name === productName
+  const stats = useMemo(() => {
+    const total = products.length;
+    const low = products.filter((p) => {
+      const stock = Number(p.stock || 0);
+      return stock > 0 && stock <= 5;
+    }).length;
+    const out = products.filter((p) => Number(p.stock || 0) === 0).length;
+    const value = products.reduce(
+      (sum, p) => sum + Number(p.price || 0) * Number(p.stock || 0),
+      0
     );
 
-  if (
-    Number(product.stock) <= 0 &&
-    change < 0
-  ) {
-    alert("Stock cannot be negative");
-    return;
-  }
+    return { total, low, out, value };
+  }, [products]);
 
-  try {
+  const getStockStatus = (stock) => {
+    const qty = Number(stock || 0);
 
-    await fetch(SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {
-        "Content-Type":
-          "text/plain;charset=utf-8",
-      },
-      body: JSON.stringify({
-        action: "updateStock",
-        productName,
-        change,
-      }),
-    });
+    if (qty === 0) {
+      return {
+        label: "Out Of Stock",
+        className: "bg-red-100 text-red-600 border border-red-200",
+      };
+    }
 
-    setTimeout(loadProducts, 1000);
+    if (qty <= 5) {
+      return {
+        label: "Low Stock",
+        className: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+      };
+    }
 
-  } catch (err) {
+    return {
+      label: "In Stock",
+      className: "bg-green-100 text-green-700 border border-green-200",
+    };
+  };
 
-    console.log(err);
+  const formatMoney = (value) => {
+    const num = Number(value || 0);
+    if (Number.isNaN(num)) return "₹0";
+    return `₹${num.toLocaleString("en-IN")}`;
+  };
 
-  }
+  const resetNewProduct = () => {
+    setNewProduct(EMPTY_PRODUCT);
+  };
 
-};
+  const handleAddProduct = async () => {
+    if (!newProduct.name || !newProduct.price) {
+      alert("Please enter product name and price");
+      return;
+    }
+
+    try {
+      const payload = {
+        ...newProduct,
+        price: Number(newProduct.price || 0),
+        stock: Number(newProduct.stock || 0),
+      };
+
+      const res = await addProduct(payload);
+
+      if (res?.success) {
+        alert("Product added successfully");
+        setShowAddModal(false);
+        resetNewProduct();
+        loadProducts();
+      } else {
+        alert(res?.message || "Failed to add product");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to add product");
+    }
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct?.name || !editingProduct?.price) {
+      alert("Please enter product name and price");
+      return;
+    }
+
+    try {
+      const payload = {
+        ...editingProduct,
+        price: Number(editingProduct.price || 0),
+        stock: Number(editingProduct.stock || 0),
+      };
+
+      const res = await updateProduct(payload);
+
+      if (res?.success) {
+        alert("Product updated successfully");
+        setShowEditModal(false);
+        setEditingProduct(null);
+        loadProducts();
+      } else {
+        alert(res?.message || "Failed to update product");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update product");
+    }
+  };
+
+  const handleDeleteProduct = async (product) => {
+    const ok = window.confirm(`Delete "${product.name}" from products list?`);
+    if (!ok) return;
+
+    try {
+      const res = await deleteProduct(product.id || product.name);
+
+      if (res?.success) {
+        alert("Product deleted successfully");
+        loadProducts();
+      } else {
+        alert(res?.message || "Failed to delete product");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete product");
+    }
+  };
 
   return (
-
-    <div className="min-h-screen bg-gray-100 p-10">
-
-      <h1 className="text-5xl font-black text-green-700 mb-10">
-
-        Product Management
-
-      </h1>
-      <div className="grid md:grid-cols-4 gap-6 mb-8">
-
-  <div className="bg-white rounded-3xl p-6 shadow">
-    <p>Total Products</p>
-    <h2 className="text-4xl font-black text-green-600">
-      {products.length}
-    </h2>
-  </div>
-
-  <div className="bg-white rounded-3xl p-6 shadow">
-    <p>In Stock</p>
-    <h2 className="text-4xl font-black text-blue-600">
-      {
-        products.filter(
-          p => Number(p.stock) > 0
-        ).length
-      }
-    </h2>
-  </div>
-
-  <div className="bg-white rounded-3xl p-6 shadow">
-    <p>Low Stock</p>
-    <h2 className="text-4xl font-black text-orange-600">
-      {
-        products.filter(
-          p =>
-            Number(p.stock) > 0 &&
-            Number(p.stock) < 10
-        ).length
-      }
-    </h2>
-  </div>
-
-  <div className="bg-white rounded-3xl p-6 shadow">
-    <p>Out Of Stock</p>
-    <h2 className="text-4xl font-black text-red-600">
-      {
-        products.filter(
-          p => Number(p.stock) <= 0
-        ).length
-      }
-    </h2>
-  </div>
-
-</div>
-
-      <div className="bg-white rounded-3xl p-8 shadow mb-10">
-
-        <div className="grid md:grid-cols-4 gap-4">
-
-          <input
-            placeholder="Name"
-            value={name}
-            onChange={(e)=>
-              setName(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
-
-          <input
-            placeholder="Price"
-            value={price}
-            onChange={(e)=>
-              setPrice(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
-
-          <input
-            placeholder="Stock"
-            value={stock}
-            onChange={(e)=>
-              setStock(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
-
-          <input
-            placeholder="Image URL"
-            value={image}
-            onChange={(e)=>
-              setImage(
-                e.target.value
-              )
-            }
-            className="border p-3 rounded-xl"
-          />
-
-        </div>
-
-        <button
-          onClick={addProduct}
-          className="mt-5 bg-green-600 text-white px-6 py-3 rounded-xl"
-        >
-          Add Product
-        </button>
-
-      </div>
-
-      <div className="grid md:grid-cols-5 gap-6">
-        {products.length === 0 && (
-
-            <div className="col-span-3 bg-white rounded-3xl p-10 text-center shadow">
-
-                <h2 className="text-2xl font-bold text-gray-500">
-                No Products Found
-                </h2>
-
+    <AdminLayout title="Products Management">
+      <div className="space-y-5 sm:space-y-6">
+        {/* HERO */}
+        <div className="rounded-[26px] sm:rounded-[30px] bg-gradient-to-r from-green-700 via-emerald-600 to-green-700 p-4 sm:p-6 text-white shadow-xl">
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-white/80 text-xs sm:text-sm">
+                Admin Product Control
+              </p>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black mt-1">
+                🥛 Products Management
+              </h1>
+              <p className="text-white/90 mt-2 text-sm sm:text-base">
+                Add, edit, delete and manage dairy products, stock and pricing.
+              </p>
             </div>
 
-            )}
+            <div className="grid grid-cols-2 sm:flex gap-3">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="px-4 py-3 rounded-2xl bg-white text-green-700 font-bold shadow text-sm sm:text-base"
+              >
+                + Add Product
+              </button>
 
-        {products.map((product) => (
+              <button
+                onClick={loadProducts}
+                className="px-4 py-3 rounded-2xl bg-white/15 border border-white/20 text-white font-bold text-sm sm:text-base"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
 
-          <div
-  key={product.name}
-  className="bg-white rounded-3xl p-5 shadow-lg"
->
+        {/* STATS */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+          <StatCard title="Total" value={stats.total} color="green" icon="🥛" />
+          <StatCard title="Low Stock" value={stats.low} color="yellow" icon="⚠️" />
+          <StatCard title="Out" value={stats.out} color="red" icon="📦" />
+          <StatCard
+            title="Value"
+            value={formatMoney(stats.value)}
+            color="blue"
+            icon="💰"
+          />
+        </div>
 
-  <img
-  src={
-    product.image ||
-    "https://via.placeholder.com/300x200?text=Milk"
-  }
-  alt={product.name}
-  onError={(e) => {
-    e.target.src =
-      "https://via.placeholder.com/300x200?text=Milk";
-  }}
-  className="h-48 w-full object-cover rounded-xl"
-/>
+        {/* FILTERS */}
+        <div className="bg-white rounded-3xl shadow-lg border border-slate-100 p-4 sm:p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Search Product
+              </label>
+              <input
+                type="text"
+                placeholder="Search product..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              />
+            </div>
 
-  <h3 className="font-bold text-lg mt-3 text-center">
-    {product.name}
-  </h3>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Category
+              </label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              >
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat || "Uncategorized"}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-  <p className="text-green-600 font-bold">
-    ₹{product.price}
-  </p>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Stock Status
+              </label>
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+                className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              >
+                <option value="All">All</option>
+                <option value="In Stock">In Stock</option>
+                <option value="Low Stock">Low Stock</option>
+                <option value="Out Of Stock">Out Of Stock</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
-  <p className="mb-4">
-    Stock: {product.stock}
-  </p>
+        {/* PRODUCT LIST */}
+        {loading ? (
+          <div className="bg-slate-50 rounded-3xl p-10 text-center">
+            <div className="text-5xl mb-3 animate-pulse">⏳</div>
+            <p className="text-lg font-semibold text-slate-600">
+              Loading products...
+            </p>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="bg-white rounded-3xl shadow-lg border border-slate-100 p-10 text-center">
+            <div className="text-6xl mb-4">🥛</div>
+            <h2 className="text-2xl font-black text-slate-700">No products found</h2>
+            <p className="text-slate-500 mt-2">
+              Try changing search/filter or add a new product.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {filteredProducts.map((product, index) => {
+              const status = getStockStatus(product.stock);
 
-  <div className="flex gap-2">
+              return (
+                <div
+                  key={product.id || index}
+                  className="bg-white rounded-3xl shadow-md border border-slate-100 p-4 sm:p-5 hover:shadow-xl transition"
+                >
+                  {/* MOBILE FIRST PRODUCT CARD */}
+                  <div className="flex flex-col gap-4">
+                    {/* TOP */}
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      {/* IMAGE */}
+                      <div className="w-full sm:w-36 shrink-0">
+                        <img
+                          src={product.image || DEFAULT_IMAGE}
+                          alt={product.name}
+                          className="w-full h-44 sm:h-32 object-cover rounded-2xl border"
+                        />
+                      </div>
 
-    <button
-      onClick={() =>
-        updateStock(
-          product.name,
-          1
-        )
-      }
-      className="flex-1 bg-green-500 text-white py-2 rounded-xl"
-    >
-      + Stock
-    </button>
+                      {/* MAIN DETAILS */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="min-w-0">
+                            <h2 className="text-xl sm:text-2xl font-black text-slate-800 break-words">
+                              {product.name || "-"}
+                            </h2>
+                            <p className="text-sm text-slate-500 mt-1 break-all">
+                              Product ID: {product.id || "-"}
+                            </p>
+                          </div>
 
-    <button
-      onClick={() =>
-        updateStock(
-          product.name,
-          -1
-        )
-      }
-      className="flex-1 bg-orange-500 text-white py-2 rounded-xl"
-    >
-      - Stock
-    </button>
+                          <span
+                            className={`inline-flex w-fit px-3 py-1 rounded-full font-bold text-xs sm:text-sm ${status.className}`}
+                          >
+                            {status.label}
+                          </span>
+                        </div>
 
-  </div>
+                        <div className="grid grid-cols-2 gap-3 mt-4">
+                          <InfoBox label="Category" value={product.category || "-"} />
+                          <InfoBox label="Stock" value={product.stock || 0} />
+                          <InfoBox label="Price" value={formatMoney(product.price)} />
+                          <InfoBox
+                            label="Value"
+                            value={formatMoney(
+                              Number(product.price || 0) * Number(product.stock || 0)
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-  <button
-    onClick={() =>
-      deleteProduct(
-        product.name
-      )
-    }
-    className="w-full mt-3 bg-red-500 text-white py-2 rounded-xl"
-  >
-    Delete Product
-  </button>
+                    {/* ACTIONS */}
+                    <div className="grid grid-cols-2 sm:flex gap-3 sm:justify-end">
+                      <button
+                        onClick={() => {
+                          setEditingProduct({
+                            id: product.id || "",
+                            name: product.name || "",
+                            price: product.price || "",
+                            stock: product.stock || "",
+                            image: product.image || "",
+                            category: product.category || "",
+                          });
+                          setShowEditModal(true);
+                        }}
+                        className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow text-sm sm:text-base"
+                      >
+                        Edit
+                      </button>
 
-</div>
+                      <button
+                        onClick={() => handleDeleteProduct(product)}
+                        className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold shadow text-sm sm:text-base"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-        ))}
+        {/* ADD MODAL */}
+        {showAddModal && (
+          <ProductModal
+            title="Add New Product"
+            product={newProduct}
+            setProduct={setNewProduct}
+            onClose={() => {
+              setShowAddModal(false);
+              resetNewProduct();
+            }}
+            onSave={handleAddProduct}
+            saveText="Add Product"
+          />
+        )}
 
+        {/* EDIT MODAL */}
+        {showEditModal && editingProduct && (
+          <ProductModal
+            title="Edit Product"
+            product={editingProduct}
+            setProduct={setEditingProduct}
+            onClose={() => {
+              setShowEditModal(false);
+              setEditingProduct(null);
+            }}
+            onSave={handleUpdateProduct}
+            saveText="Save Changes"
+          />
+        )}
       </div>
-
-    </div>
-
+    </AdminLayout>
   );
+}
 
+function StatCard({ title, value, color = "green", icon = "📊" }) {
+  const styles = {
+    green: "border-green-100 text-green-700 bg-white",
+    yellow: "border-yellow-100 text-yellow-700 bg-white",
+    red: "border-red-100 text-red-700 bg-white",
+    blue: "border-blue-100 text-blue-700 bg-white",
+  };
+
+  return (
+    <div
+      className={`rounded-3xl p-4 sm:p-5 shadow-lg border ${styles[color] || styles.green}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-slate-500 text-xs sm:text-sm">{title}</p>
+          <h3 className="text-xl sm:text-3xl font-black mt-2 break-words">
+            {value}
+          </h3>
+        </div>
+        <div className="text-2xl sm:text-3xl shrink-0">{icon}</div>
+      </div>
+    </div>
+  );
+}
+
+function InfoBox({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4 min-w-0">
+      <p className="text-xs sm:text-sm text-slate-500 font-medium">{label}</p>
+      <h3 className="text-sm sm:text-lg font-black text-slate-800 mt-1 break-words">
+        {value}
+      </h3>
+    </div>
+  );
+}
+
+function ProductModal({
+  title,
+  product,
+  setProduct,
+  onClose,
+  onSave,
+  saveText,
+}) {
+  const updateField = (field, value) => {
+    setProduct((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 z-[999] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center px-3 py-3 sm:py-4">
+      <div className="w-full max-w-3xl bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-green-700 to-emerald-600 text-white px-4 sm:px-6 py-4 sm:py-5 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black">{title}</h2>
+            <p className="text-white/80 text-xs sm:text-sm mt-1">
+              Manage product details, stock and pricing
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white text-xl shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Product ID
+            </label>
+            <input
+              type="text"
+              value={product.id || ""}
+              onChange={(e) => updateField("id", e.target.value)}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              placeholder="P001"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Product Name
+            </label>
+            <input
+              type="text"
+              value={product.name || ""}
+              onChange={(e) => updateField("name", e.target.value)}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              placeholder="Buffalo Milk"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Price
+            </label>
+            <input
+              type="number"
+              value={product.price || ""}
+              onChange={(e) => updateField("price", e.target.value)}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              placeholder="85"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Stock
+            </label>
+            <input
+              type="number"
+              value={product.stock || ""}
+              onChange={(e) => updateField("stock", e.target.value)}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              placeholder="25"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Category
+            </label>
+            <input
+              type="text"
+              value={product.category || ""}
+              onChange={(e) => updateField("category", e.target.value)}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              placeholder="Milk / Curd / Ghee"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              Image URL
+            </label>
+            <input
+              type="text"
+              value={product.image || ""}
+              onChange={(e) => updateField("image", e.target.value)}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
+              placeholder="https://..."
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-bold text-slate-700 mb-3">Preview</p>
+
+              <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr] gap-4 items-start">
+                <img
+                  src={product.image || DEFAULT_IMAGE}
+                  alt={product.name || "Preview"}
+                  className="w-full sm:w-[120px] h-36 sm:h-28 object-cover rounded-2xl border"
+                />
+
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-800 break-words">
+                    {product.name || "Product Name"}
+                  </h3>
+                  <p className="text-slate-500 mt-1 break-words">
+                    Category: {product.category || "-"}
+                  </p>
+                  <p className="text-green-700 font-black text-lg sm:text-xl mt-3">
+                    ₹{product.price || 0}
+                  </p>
+                  <p className="text-slate-600 mt-1">Stock: {product.stock || 0}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 sm:px-6 pb-5 sm:pb-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold shadow"
+          >
+            {saveText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

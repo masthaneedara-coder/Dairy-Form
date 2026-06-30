@@ -1,515 +1,596 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  fetchOrdersByPhone,
+  fetchSubscriptionsByPhone,
+  updateSubscriptionStatus,
+} from "../config/api";
+import {
+  getCustomerName,
+  getCustomerPhone,
+  logoutCustomer,
+} from "../config/auth";
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
+  const subscriptionScrollRef = useRef(null);
 
-  const customerName =
-    localStorage.getItem("customerName") || "Customer";
+    const scrollSubscriptions = (direction = "right") => {
+      if (!subscriptionScrollRef.current) return;
 
-  const customerPhone =
-    localStorage.getItem("customerPhone") || "";
+      const container = subscriptionScrollRef.current;
+      const scrollAmount = window.innerWidth < 640 ? 320 : 420;
 
-  const SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbxrawDo75QKP1RwDwjjAKwoE0-so9UdTG2V4Dpq94PF8KOrMNx4CpfBEuNlk7VvblII/exec";
+      container.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    };
 
-  const [subscriptions, setSubscriptions] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [deliveryOrders, setDeliveryOrders] = useState([]);
-  const [bills, setBills] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [statusUpdatingId, setStatusUpdatingId] = useState("");
 
-  const formatDate = (date) => {
-    if (!date) return "-";
-    const d = new Date(date);
-    if (isNaN(d)) return "-";
+  const customerName = getCustomerName() || "Customer";
+  const customerPhone = getCustomerPhone() || "";
 
-    return d.toLocaleDateString("en-IN", {
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+
+        const phone =
+          getCustomerPhone() || localStorage.getItem("customerPhone") || "";
+
+        if (!phone) {
+          setOrders([]);
+          setSubscriptions([]);
+          return;
+        }
+
+        const [ordersData, subscriptionsData] = await Promise.all([
+          fetchOrdersByPhone(phone),
+          fetchSubscriptionsByPhone(phone),
+        ]);
+
+        setOrders(Array.isArray(ordersData) ? ordersData : []);
+        setSubscriptions(Array.isArray(subscriptionsData) ? subscriptionsData : []);
+      } catch (error) {
+        console.error("Dashboard load failed:", error);
+        setOrders([]);
+        setSubscriptions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, [customerPhone]);
+
+  const totalOrders = useMemo(() => orders.length, [orders]);
+
+  const totalSpent = useMemo(
+    () =>
+      orders.reduce(
+        (sum, order) => sum + Number(order.totalAmount || order.total || 0),
+        0
+      ),
+    [orders]
+  );
+
+  const activeSubscriptions = useMemo(
+    () =>
+      subscriptions.filter(
+        (sub) => String(sub.status || "").toLowerCase() === "active"
+      ),
+    [subscriptions]
+  );
+
+  const pausedSubscriptions = useMemo(
+    () =>
+      subscriptions.filter(
+        (sub) => String(sub.status || "").toLowerCase() === "paused"
+      ),
+    [subscriptions]
+  );
+
+  const subscriptionCount = useMemo(() => subscriptions.length, [subscriptions]);
+  const activeSubscriptionCount = useMemo(
+    () => activeSubscriptions.length,
+    [activeSubscriptions]
+  );
+
+  const dashboardStatus =
+    activeSubscriptionCount > 0 ? "Active" : subscriptionCount > 0 ? "Paused" : "No Subscription";
+
+  const latestOrders = useMemo(() => orders.slice(0, 5), [orders]);
+
+  const handleLogout = () => {
+    logoutCustomer();
+    navigate("/");
+  };
+
+  const formatMoney = (value) => {
+    const num = Number(value || 0);
+    if (Number.isNaN(num)) return "₹0";
+    return `₹${num.toLocaleString("en-IN")}`;
+  };
+
+  const formatDate = (value) => {
+    if (!value) return "N/A";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+
+    return date.toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
     });
   };
 
-  const getRemainingDays = (expireDate) => {
-    if (!expireDate) return 0;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const expiry = new Date(expireDate);
-    if (isNaN(expiry)) return 0;
-
-    expiry.setHours(0, 0, 0, 0);
-
-    const diff = Math.ceil(
-      (expiry - today) / (1000 * 60 * 60 * 24)
-    );
-
-    return diff > 0 ? diff : 0;
-  };
-
-  const getSubscriptionStatus = (sub) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (sub.status === "Paused") {
-      return "Paused";
-    }
-
-    const expiry = new Date(sub.expireDate);
-
-    if (!isNaN(expiry)) {
-      expiry.setHours(0, 0, 0, 0);
-
-      if (expiry < today) {
-        return "Expired";
-      }
-    }
-
-    return "Active";
-  };
-
-  const subscriptionsWithStatus = subscriptions.map((sub) => {
-    const remainingDays = getRemainingDays(sub.expireDate);
-    const computedStatus = getSubscriptionStatus(sub);
-
-    return {
-      ...sub,
-      remainingDays,
-      computedStatus,
-      isExpired: computedStatus === "Expired",
-    };
-  });
-
-  const loadSubscriptions = async () => {
+  const handleSubscriptionStatusChange = async (subscriptionId, status) => {
     try {
-      const res = await fetch(
-        `${SCRIPT_URL}?action=subscriptions&phone=${customerPhone}`
-      );
-      const data = await res.json();
-      setSubscriptions(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Failed to load subscriptions:", error);
-      setSubscriptions([]);
-    }
-  };
+      setStatusUpdatingId(subscriptionId);
 
-  const loadOrders = async () => {
-    try {
-      const ordersRes = await fetch(
-        `${SCRIPT_URL}?action=orders&phone=${customerPhone}`
-      );
-      const ordersData = await ordersRes.json();
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      const res = await updateSubscriptionStatus(subscriptionId, status);
 
-      const deliveryRes = await fetch(
-        `${SCRIPT_URL}?action=deliveryStatus&phone=${customerPhone}`
-      );
-      const deliveryData = await deliveryRes.json();
-      setDeliveryOrders(Array.isArray(deliveryData) ? deliveryData : []);
-
-      const billsRes = await fetch(
-        `${SCRIPT_URL}?action=customerBills&phone=${customerPhone}`
-      );
-      const billsData = await billsRes.json();
-      setBills(Array.isArray(billsData) ? billsData : []);
-    } catch (error) {
-      console.error("Failed to load orders:", error);
-      setOrders([]);
-      setDeliveryOrders([]);
-      setBills([]);
-    }
-  };
-
-  useEffect(() => {
-    const loadAll = async () => {
-      setLoading(true);
-      await Promise.all([loadSubscriptions(), loadOrders()]);
-      setLoading(false);
-    };
-
-    loadAll();
-
-    const interval = setInterval(() => {
-      loadOrders();
-      loadSubscriptions();
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const updateSubscription = async (subscriptionId, status) => {
-    try {
-      const res = await fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8",
-        },
-        body: JSON.stringify({
-          action: "updateSubscriptionStatus",
-          subscriptionId,
-          status,
-        }),
-      });
-
-      const result = await res.json();
-
-      if (result.success) {
-        alert(
-          status === "Active"
-            ? "Subscription resumed successfully"
-            : "Subscription paused successfully"
+      if (res?.success) {
+        setSubscriptions((prev) =>
+          prev.map((sub) =>
+            sub.subscriptionId === subscriptionId ? { ...sub, status } : sub
+          )
         );
-
-        await loadSubscriptions();
+        alert(`Subscription ${status.toLowerCase()} successfully`);
       } else {
-        alert(result.message || "Failed to update subscription");
+        alert(res?.message || "Failed to update subscription");
       }
-    } catch (err) {
-      console.error("Update subscription error:", err);
+    } catch (error) {
+      console.error("Subscription status update failed:", error);
       alert("Failed to update subscription");
+    } finally {
+      setStatusUpdatingId("");
     }
   };
 
-  const activePlans = subscriptionsWithStatus.filter(
-    (s) => s.computedStatus === "Active"
-  ).length;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-green-50 via-white to-emerald-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-3xl shadow-xl border border-green-100 px-8 py-10 text-center max-w-md w-full">
+          <div className="text-5xl mb-4">🥛</div>
+          <h2 className="text-2xl font-black text-green-700">
+            Loading Dashboard...
+          </h2>
+          <p className="text-gray-500 mt-2">
+            Please wait while we fetch your orders and subscription details.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
-      {/* HERO */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 rounded-3xl shadow-2xl p-4 sm:p-6 md:p-8 mb-6 sm:mb-8">
-        <div className="absolute top-0 right-0 opacity-10 text-[120px] sm:text-[180px]">
-          🥛
-        </div>
+    <div className="min-h-screen bg-gradient-to-b from-green-50 via-white to-emerald-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+      <div className="max-w-7xl mx-auto">
+        {/* HEADER */}
+        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-r from-green-700 via-emerald-600 to-green-700 p-6 sm:p-8 text-white shadow-2xl">
+          <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/10 blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/10 blur-3xl"></div>
 
-        <div className="relative overflow-hidden rounded-[28px] sm:rounded-[40px] bg-gradient-to-br from-emerald-700 via-green-600 to-emerald-400 shadow-2xl">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-10 left-10 sm:left-20 w-40 sm:w-72 h-40 sm:h-72 bg-white rounded-full blur-3xl"></div>
-            <div className="absolute bottom-10 right-10 sm:right-20 w-40 sm:w-72 h-40 sm:h-72 bg-white rounded-full blur-3xl"></div>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-6 p-5 sm:p-8 md:p-10 relative z-10">
-            <div className="flex flex-col justify-center">
-              <div className="inline-flex items-center gap-3 mb-4 sm:mb-6">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center text-xl sm:text-2xl">
-                  🌿
-                </div>
-
-                <span className="text-green-100 tracking-[2px] sm:tracking-[4px] text-xs sm:text-sm font-semibold">
-                  FARM FRESH DAIRY
-                </span>
-              </div>
-
-              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-black text-white leading-tight">
-                Welcome 👋
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+            <div>
+              <p className="text-white/80 text-sm sm:text-base">Welcome back</p>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mt-1">
+                👋 {customerName}
               </h1>
+              <p className="mt-2 text-white/90">
+                Phone: {customerPhone || "Not available"}
+              </p>
+            </div>
 
-              <h2 className="text-2xl sm:text-3xl lg:text-5xl font-bold text-yellow-100 mt-2 sm:mt-3 break-words">
-                {customerName}
-              </h2>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => navigate("/products")}
+                className="px-5 py-3 rounded-2xl bg-white text-green-700 font-bold shadow"
+              >
+                Shop Products
+              </button>
 
-              <div className="mt-5 sm:mt-8 inline-flex items-center gap-3 bg-black/20 backdrop-blur-xl px-4 sm:px-6 py-3 sm:py-4 rounded-2xl sm:rounded-full w-fit max-w-full">
-                <span className="text-xl sm:text-2xl">📞</span>
+              <button
+                onClick={() => navigate("/subscription")}
+                className="px-5 py-3 rounded-2xl bg-white/15 border border-white/20 text-white font-bold"
+              >
+                Subscription
+              </button>
 
-                <span className="text-base sm:text-xl md:text-2xl font-bold text-white break-all">
-                  {customerPhone}
-                </span>
+              <button
+                onClick={handleLogout}
+                className="px-5 py-3 rounded-2xl bg-red-500 text-white font-bold"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* STATS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
+          <StatCard title="Total Orders" value={totalOrders} color="green" />
+          <StatCard title="Total Spent" value={formatMoney(totalSpent)} color="blue" />
+          <StatCard title="Subscriptions" value={subscriptionCount} color="orange" />
+          <StatCard title="Active Subs" value={activeSubscriptionCount} color="emerald" />
+          <StatCard title="Status" value={dashboardStatus} color="pink" />
+        </div>
+
+        {/* SUBSCRIPTIONS LIST */}
+          <div className="mt-8 bg-white rounded-3xl shadow-lg border border-green-100 overflow-hidden">
+            <div className="bg-gradient-to-r from-green-600 to-emerald-500 px-4 sm:px-6 py-5 text-white">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-black">Subscription Information</h2>
+                  <p className="text-sm text-green-50 mt-1">
+                    Swipe left or right to see all subscriptions
+                  </p>
+                </div>
+
+                {subscriptions.length > 1 && (
+                  <div className="hidden md:flex items-center gap-3">
+                    <button
+                      onClick={() => scrollSubscriptions("left")}
+                      className="w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white text-xl font-bold transition"
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={() => scrollSubscriptions("right")}
+                      className="w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white text-xl font-bold transition"
+                    >
+                      →
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="hidden lg:flex justify-center items-center relative">
-              <div className="absolute w-[320px] h-[320px] border-[24px] border-white/10 rounded-full"></div>
-            </div>
-          </div>
-
-          <div className="absolute bottom-0 left-0 w-full h-16 sm:h-24 bg-white rounded-t-[100%]"></div>
-        </div>
-      </div>
-
-      {/* SUMMARY */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 sm:mb-8">
-        <div className="bg-green-600 text-white rounded-3xl p-5 shadow-lg">
-          <p className="text-sm sm:text-lg">Total Subscriptions</p>
-          <h2 className="text-3xl sm:text-4xl font-black mt-2">
-            {subscriptions.length}
-          </h2>
-        </div>
-
-        <div className="bg-purple-600 text-white rounded-3xl p-5 shadow-lg">
-          <p className="text-sm sm:text-lg">Active Plans</p>
-          <h2 className="text-3xl sm:text-4xl font-black mt-2">
-            {activePlans}
-          </h2>
-        </div>
-
-        <div className="bg-orange-500 text-white rounded-3xl p-5 shadow-lg sm:col-span-2 lg:col-span-1">
-          <p className="text-sm sm:text-lg">Today's Orders</p>
-          <h2 className="text-3xl sm:text-4xl font-black mt-2">
-            {orders.length}
-          </h2>
-        </div>
-      </div>
-
-      {/* ACTION BUTTONS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-        <button
-          onClick={() => navigate("/products")}
-          className="bg-green-600 text-white p-4 sm:p-5 rounded-2xl font-bold text-sm sm:text-base"
-        >
-          🛒 Order Products
-        </button>
-
-        <button
-          onClick={() => navigate("/subscription")}
-          className="bg-blue-600 text-white p-4 sm:p-5 rounded-2xl font-bold text-sm sm:text-base"
-        >
-          🥛 Subscribe Milk
-        </button>
-
-        <button
-          onClick={() => navigate("/order-history")}
-          className="bg-orange-500 text-white p-4 sm:p-5 rounded-2xl font-bold text-sm sm:text-base"
-        >
-          📦 My Orders
-        </button>
-
-        <button
-          onClick={() => navigate("/track-order")}
-          className="bg-purple-600 text-white p-4 sm:p-5 rounded-2xl font-bold text-sm sm:text-base"
-        >
-          🚚 Track Delivery
-        </button>
-      </div>
-
-      {/* SUBSCRIPTIONS */}
-      <div className="bg-white rounded-3xl shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-          <h2 className="text-2xl sm:text-3xl font-black text-green-700">
-            🥛 Active Subscriptions
-          </h2>
-
-          <button
-            onClick={() => navigate("/subscription")}
-            className="bg-green-600 text-white px-5 py-3 rounded-xl font-bold w-full sm:w-auto"
-          >
-            + Add Subscription
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-10 text-gray-500">
-            Loading dashboard...
-          </div>
-        ) : subscriptions.length === 0 ? (
-          <div className="text-center py-10">
-            <div className="text-6xl">🥛</div>
-            <h3 className="text-2xl font-bold mt-4">
-              No Active Subscription
-            </h3>
-
-            <button
-              onClick={() => navigate("/subscription")}
-              className="mt-5 bg-green-600 text-white px-6 py-3 rounded-xl"
-            >
-              Subscribe Now
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6">
-            {subscriptionsWithStatus.map((sub) => (
-              <div
-                key={sub.subscriptionId}
-                className="bg-gradient-to-br from-green-600 to-emerald-500 rounded-3xl p-5 sm:p-6 text-white shadow-xl"
-              >
-                <div className="flex justify-between items-start gap-3 mb-5">
-                  <div className="min-w-0">
-                    <h3 className="text-2xl sm:text-3xl font-black break-words">
-                      🥛 {sub.product}
-                    </h3>
-
-                    <p className="text-green-100 mt-1 text-sm sm:text-base">
-                      Fresh Farm Delivery
-                    </p>
-                  </div>
-
-                  <span
-                    className={`px-3 py-1.5 rounded-full font-bold text-xs sm:text-sm whitespace-nowrap ${
-                      sub.computedStatus === "Active"
-                        ? "bg-green-500 text-white"
-                        : sub.computedStatus === "Paused"
-                        ? "bg-orange-500 text-white"
-                        : "bg-red-500 text-white"
-                    }`}
-                  >
-                    {sub.computedStatus}
-                  </span>
-                </div>
-
-                {sub.computedStatus === "Active" &&
-                  sub.remainingDays <= 5 &&
-                  sub.remainingDays > 0 && (
-                    <div className="bg-yellow-100 text-yellow-700 p-3 rounded-xl font-bold mb-4 text-sm">
-                      ⚠️ Subscription expires in {sub.remainingDays} days
-                    </div>
-                  )}
-
-                <div className="mb-5">
-                  <div className="flex justify-between mb-2 text-sm sm:text-base gap-3">
-                    <span>Remaining Days</span>
-
-                    <span className="font-semibold text-right">
-                      {sub.computedStatus === "Expired"
-                        ? "Expired"
-                        : sub.computedStatus === "Paused"
-                        ? "Paused"
-                        : `${sub.remainingDays} Days`}
-                    </span>
-                  </div>
-
-                  <div className="w-full bg-white/20 rounded-full h-3">
-                    <div
-                      className="bg-white h-3 rounded-full"
-                      style={{
-                        width: `${Math.min(
-                          (sub.remainingDays / 30) * 100,
-                          100
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-end gap-4 mb-5">
-                  <div>
-                    <p className="text-green-100 text-sm">Monthly Bill</p>
-                    <h3 className="text-2xl sm:text-3xl font-black">
-                      ₹{sub.price}
-                    </h3>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-green-100 text-sm">Expiry</p>
-                    <p className="font-bold text-sm sm:text-base">
-                      {formatDate(sub.expireDate)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  <button
-                    onClick={() => navigate("/track-order")}
-                    className="bg-white text-green-700 py-3 rounded-2xl font-bold text-sm sm:text-base"
-                  >
-                    🚚 Track
-                  </button>
-
-                  {sub.computedStatus === "Expired" ? (
-                    <button
-                      onClick={() => navigate("/subscription")}
-                      className="bg-orange-500 text-white py-3 rounded-2xl font-bold text-sm sm:text-base"
-                    >
-                      Renew
-                    </button>
-                  ) : sub.computedStatus === "Paused" ? (
-                    <button
-                      onClick={() =>
-                        updateSubscription(sub.subscriptionId, "Active")
-                      }
-                      className="py-3 rounded-2xl font-bold bg-green-800 text-white text-sm sm:text-base"
-                    >
-                      Resume
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() =>
-                        updateSubscription(sub.subscriptionId, "Paused")
-                      }
-                      className="py-3 rounded-2xl font-bold bg-red-500 text-white text-sm sm:text-base"
-                    >
-                      Pause
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* TODAY ORDERS */}
-      <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 mt-6 sm:mt-8">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-          <h2 className="text-2xl sm:text-3xl font-black text-gray-800">
-            🛒 Today's Orders
-          </h2>
-
-          <span className="bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold w-fit">
-            {orders.length} Orders
-          </span>
-        </div>
-
-        {orders.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">
-            No orders found
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {orders.map((order, index) => (
-              <div
-                key={index}
-                className="bg-white border border-gray-100 rounded-3xl shadow-md hover:shadow-xl transition-all p-5"
-              >
-                <div className="flex justify-between items-start gap-3 mb-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">
-                      {order.product?.includes("Curd") ? "🥣" : "🥛"}
-                    </div>
-
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-base sm:text-lg text-gray-800 break-words">
-                        {order.product}
-                      </h3>
-
-                      <p className="text-xs text-green-600">
-                        Farm Fresh Dairy
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap">
-                    {order.status}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 my-4">
-                  <div className="bg-gray-50 rounded-xl p-3 text-center">
-                    <p className="text-xs text-gray-500">Quantity</p>
-                    <h4 className="text-xl sm:text-2xl font-bold">
-                      {order.qty}
-                    </h4>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-xl p-3 text-center">
-                    <p className="text-xs text-gray-500">Amount</p>
-                    <h4 className="text-xl sm:text-2xl font-bold text-green-600">
-                      ₹{order.amount}
-                    </h4>
-                  </div>
-                </div>
-
+            {subscriptions.length === 0 ? (
+              <div className="p-8 text-center">
+                <div className="text-5xl mb-3">🥛</div>
+                <h2 className="text-2xl font-black text-gray-800">
+                  No Subscription Found
+                </h2>
+                <p className="text-gray-500 mt-2">
+                  Start a milk subscription for hassle-free delivery.
+                </p>
                 <button
-                  onClick={() => navigate("/track-order")}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-sm sm:text-base"
+                  onClick={() => navigate("/subscription")}
+                  className="mt-5 px-6 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold"
                 >
-                  🚚 Track Order
+                  Subscribe Now
                 </button>
               </div>
-            ))}
+            ) : (
+              <div className="p-4 sm:p-6">
+                {/* SCROLLABLE ROW */}
+                <div
+                  ref={subscriptionScrollRef}
+                  className="
+                    flex gap-4 sm:gap-5 overflow-x-auto pb-3
+                    snap-x snap-mandatory scroll-smooth
+                    [-ms-overflow-style:none] [scrollbar-width:none]
+                    [&::-webkit-scrollbar]:hidden
+                  "
+                >
+                  {subscriptions.map((sub, index) => {
+                    const status = String(sub.status || "Active").toLowerCase();
+                    const isActive = status === "active";
+                    const isPaused = status === "paused";
+                    const isExpired = status === "expired";
+                    const isStopped = status === "stopped";
+
+                    return (
+                      <div
+                        key={sub.subscriptionId || index}
+                        className="
+                          snap-start shrink-0
+                          w-[92%] sm:w-[430px] lg:w-[460px]
+                          rounded-[28px] border border-slate-200 bg-gradient-to-br from-white to-slate-50
+                          shadow-md hover:shadow-xl transition-all duration-300
+                          hover:-translate-y-1
+                        "
+                      >
+                        {/* CARD HEADER */}
+                        <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">
+                              Subscription
+                            </p>
+                            <h3 className="text-2xl font-black text-green-700 mt-1">
+                              {sub.product || "Milk Subscription"}
+                            </h3>
+                            <p className="text-xs text-gray-500 mt-1 break-all">
+                              ID: {sub.subscriptionId || "-"}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`px-4 py-2 rounded-full text-sm font-bold shadow-sm ${
+                              isActive
+                                ? "bg-green-100 text-green-700"
+                                : isPaused
+                                ? "bg-yellow-100 text-yellow-700"
+                                : isExpired
+                                ? "bg-red-100 text-red-700"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {sub.status || "Active"}
+                          </span>
+                        </div>
+
+                        {/* CARD BODY */}
+                        <div className="p-5 grid grid-cols-2 gap-3">
+                          <MiniInfoCard
+                            label="Quantity"
+                            value={sub.qty || "N/A"}
+                            color="blue"
+                          />
+                          <MiniInfoCard
+                            label="Delivery"
+                            value={sub.deliveryType || "N/A"}
+                            color="yellow"
+                          />
+                          <MiniInfoCard
+                            label="Monthly"
+                            value={formatMoney(sub.monthlyAmount)}
+                            color="purple"
+                          />
+                          <MiniInfoCard
+                            label="Start Date"
+                            value={formatDate(sub.startDate)}
+                            color="pink"
+                          />
+                          <div className="col-span-2">
+                            <MiniInfoCard
+                              label="Expire Date"
+                              value={formatDate(sub.expireDate)}
+                              color="emerald"
+                            />
+                          </div>
+                        </div>
+
+                        {/* CARD FOOTER */}
+                        <div className="px-5 pb-5">
+                          <div className="rounded-2xl border border-green-100 bg-green-50/70 p-4">
+                            <div className="flex flex-wrap gap-3">
+                              {isActive && (
+                                <button
+                                  onClick={() =>
+                                    handleSubscriptionStatusChange(
+                                      sub.subscriptionId,
+                                      "Paused"
+                                    )
+                                  }
+                                  disabled={statusUpdatingId === sub.subscriptionId}
+                                  className="flex-1 min-w-[120px] px-4 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow disabled:opacity-60"
+                                >
+                                  {statusUpdatingId === sub.subscriptionId
+                                    ? "Updating..."
+                                    : "Pause"}
+                                </button>
+                              )}
+
+                              {isPaused && (
+                                <button
+                                  onClick={() =>
+                                    handleSubscriptionStatusChange(
+                                      sub.subscriptionId,
+                                      "Active"
+                                    )
+                                  }
+                                  disabled={statusUpdatingId === sub.subscriptionId}
+                                  className="flex-1 min-w-[120px] px-4 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold shadow disabled:opacity-60"
+                                >
+                                  {statusUpdatingId === sub.subscriptionId
+                                    ? "Updating..."
+                                    : "Activate"}
+                                </button>
+                              )}
+
+                              {isExpired && (
+                                <button
+                                  onClick={() => navigate("/subscription")}
+                                  className="flex-1 min-w-[120px] px-4 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow"
+                                >
+                                  Renew
+                                </button>
+                              )}
+
+                              {isStopped && (
+                                <button
+                                  onClick={() =>
+                                    handleSubscriptionStatusChange(
+                                      sub.subscriptionId,
+                                      "Active"
+                                    )
+                                  }
+                                  disabled={statusUpdatingId === sub.subscriptionId}
+                                  className="flex-1 min-w-[120px] px-4 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold shadow disabled:opacity-60"
+                                >
+                                  {statusUpdatingId === sub.subscriptionId
+                                    ? "Updating..."
+                                    : "Reactivate"}
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => navigate("/subscription")}
+                                className="flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-white border border-green-200 text-green-700 font-bold hover:bg-green-50"
+                              >
+                                Manage
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* MOBILE HINT */}
+                {subscriptions.length > 1 && (
+                  <div className="mt-4 flex flex-col items-center justify-center text-center">
+                    <div className="w-full max-w-sm h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                      <div className="h-full w-24 bg-green-500 rounded-full animate-pulse"></div>
+                    </div>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-3">
+                      Swipe left / right to view all subscriptions
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        )}
+
+        {/* QUICK ACTIONS */}
+        <div className="grid md:grid-cols-3 gap-4 mt-6">
+          <QuickCard
+            icon="📦"
+            title="Order History"
+            desc="View all product orders and status"
+            color="green"
+            onClick={() => navigate("/order-history")}
+          />
+          <QuickCard
+            icon="📅"
+            title="Subscription"
+            desc="Start or renew your milk subscription"
+            color="blue"
+            onClick={() => navigate("/subscription")}
+          />
+          <QuickCard
+            icon="🛒"
+            title="Shop Products"
+            desc="Order milk, curd and dairy products"
+            color="orange"
+            onClick={() => navigate("/products")}
+          />
+        </div>
+
+        {/* RECENT ORDERS */}
+        <div className="mt-6 bg-white rounded-3xl shadow-lg border border-green-100 p-5 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+            <h2 className="text-2xl font-black text-green-700">Recent Orders</h2>
+
+            <button
+              onClick={() => navigate("/order-history")}
+              className="px-4 py-2 rounded-xl bg-green-50 text-green-700 font-bold"
+            >
+              View All
+            </button>
+          </div>
+
+          {latestOrders.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="text-5xl mb-3">📭</div>
+              <h3 className="text-xl font-bold text-gray-700">No orders yet</h3>
+              <button
+                onClick={() => navigate("/products")}
+                className="mt-4 px-5 py-3 rounded-2xl bg-green-600 text-white font-bold"
+              >
+                Order Now
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {latestOrders.map((order, index) => (
+                <div
+                  key={order.orderId || index}
+                  className="rounded-2xl bg-slate-50 border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <div>
+                    <h3 className="font-bold text-green-700">
+                      Order #{order.orderId || index + 1}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {order.date || "-"}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Status:{" "}
+                      <span className="font-semibold text-blue-600">
+                        {order.status || "Pending"}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="text-left sm:text-right">
+                    <p className="text-xl font-black text-green-700">
+                      {formatMoney(order.totalAmount || order.total || 0)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {order.paymentMethod || "-"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function StatCard({ title, value, color = "green" }) {
+  const styles = {
+    green: "border-green-100 text-green-700",
+    blue: "border-blue-100 text-blue-700",
+    orange: "border-orange-100 text-orange-600",
+    emerald: "border-emerald-100 text-emerald-700",
+    pink: "border-pink-100 text-pink-700",
+  };
+
+  return (
+    <div className={`bg-white rounded-3xl p-5 shadow-lg border ${styles[color] || styles.green}`}>
+      <p className="text-gray-500 text-sm">{title}</p>
+      <p className="text-3xl font-black mt-2">{value}</p>
+    </div>
+  );
+}
+
+function QuickCard({ icon, title, desc, color, onClick }) {
+  const colorMap = {
+    green: "border-green-100 text-green-700",
+    blue: "border-blue-100 text-blue-700",
+    orange: "border-orange-100 text-orange-600",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`bg-white rounded-3xl p-6 shadow-lg border text-left hover:-translate-y-1 transition ${colorMap[color] || ""}`}
+    >
+      <div className="text-4xl">{icon}</div>
+      <h2 className="text-xl font-black mt-3">{title}</h2>
+      <p className="text-gray-500 mt-2 text-sm">{desc}</p>
+    </button>
+  );
+}
+
+function MiniInfoCard({ label, value, color }) {
+  const styles = {
+    green: "bg-green-50 border-green-100 text-green-800",
+    blue: "bg-blue-50 border-blue-100 text-blue-700",
+    yellow: "bg-yellow-50 border-yellow-100 text-yellow-700",
+    purple: "bg-purple-50 border-purple-100 text-purple-700",
+    pink: "bg-pink-50 border-pink-100 text-pink-700",
+    emerald: "bg-emerald-50 border-emerald-100 text-emerald-700",
+  };
+
+  return (
+    <div className={`rounded-2xl border p-4 h-full ${styles[color] || styles.green}`}>
+      <p className="text-xs sm:text-sm text-gray-500 font-medium">{label}</p>
+      <h3 className="text-lg sm:text-xl font-black mt-1 break-words">{value}</h3>
     </div>
   );
 }

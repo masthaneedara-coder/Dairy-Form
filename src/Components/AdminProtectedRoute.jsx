@@ -1,15 +1,8 @@
 import { Navigate } from "react-router-dom";
+import { isAdminLoggedIn } from "../config/auth";
 
 export default function AdminProtectedRoute({ children }) {
-  const isAdminLoggedIn =
-    localStorage.getItem("adminLogin") === "true";
-
-  const userRole =
-    localStorage.getItem("userRole");
-
-  if (!isAdminLoggedIn || userRole !== "admin") {
-    return <Navigate to="/admin-login" replace />;
-  }
-
-  return children;
+  return isAdminLoggedIn()
+    ? children
+    : <Navigate to="/admin-login" replace />;
 }

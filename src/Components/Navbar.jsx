@@ -1,6 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import logo from "../assets/logo.png";
+import NotificationBell from "./NotificationBell";
+import NotificationDrawer from "./NotificationDrawer";
+import {
+  getCart,
+  getCartItemCount,
+} from "../config/cart";
 
 export default function Navbar() {
   const location = useLocation();
@@ -9,7 +15,24 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isCustomerLoggedIn, setIsCustomerLoggedIn] = useState(false);
   const [customerName, setCustomerName] = useState("");
-  const [cartCount, setCartCount] = useState(0);
+ const [cartCount, setCartCount] = useState(0);
+
+useEffect(() => {
+  const updateCart = () => {
+    setCartCount(getCartItemCount());
+  };
+
+  updateCart();
+
+  window.addEventListener("cartUpdated", updateCart);
+
+  return () => {
+    window.removeEventListener("cartUpdated", updateCart);
+  };
+}, []);
+
+
+  const [notificationOpen, setNotificationOpen] = useState(false);
 
   useEffect(() => {
     const customerLogin = localStorage.getItem("customerLogin") === "true";
@@ -40,6 +63,7 @@ export default function Navbar() {
   const goToSubscription = () => {
     if (!isCustomerLoggedIn) {
       localStorage.setItem("redirectAfterLogin", "/subscription");
+      window.dispatchEvent(new Event("cartUpdated"));
       navigate("/auth");
       return;
     }
@@ -47,12 +71,12 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50">
+    <header className="fixed top-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-xl border-b border-green-100 shadow-md transition-all duration-300">
       {/* TOP BAR */}
       <div className="relative overflow-hidden bg-gradient-to-r from-green-700 via-emerald-600 to-green-700 shadow-lg border-b border-green-400/30">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.12),transparent_35%)]"></div>
 
-        <div className="relative overflow-hidden px-8 sm:px-14">
+        <div className="relative">
           <div className="animate-marquee-premium whitespace-nowrap py-3 sm:py-3.5 text-white font-extrabold tracking-wide text-sm sm:text-base md:text-lg">
             ✨ Fresh Farm Milk Delivered Every Morning • 🥛 Pure Cow Milk • 🐃 Fresh Buffalo Milk • 🥣 Fresh Curd Available • 🚚 Free Home Delivery • 📞 Subscribe Today • 🌿 100% Natural & Healthy •
           </div>
@@ -83,8 +107,43 @@ export default function Navbar() {
                 </p>
               </div>
             </Link>
+             <div className="hidden lg:flex items-center gap-2">
+              <Link
+                to="/"
+                className="px-4 py-3 rounded-2xl font-bold text-green-700 bg-green-50 hover:bg-green-100 transition"
+              >
+                Home
+              </Link>
+
+              <Link
+                to="/products"
+                className="px-4 py-3 rounded-2xl font-semibold text-gray-700 hover:bg-green-50 hover:text-green-700 transition"
+              >
+                Products
+              </Link>
+
+              <button
+                onClick={goToSubscription}
+                className="px-4 py-3 rounded-2xl font-semibold text-gray-700 hover:bg-green-50 hover:text-green-700 transition"
+              >
+                Subscription
+              </button>
+
+              <Link
+                to="/order-history"
+                className="px-4 py-3 rounded-2xl font-semibold text-gray-700 hover:bg-green-50 hover:text-green-700 transition"
+              >
+                Orders
+              </Link>
+            </div>
 
             {/* RIGHT */}
+            <NotificationBell
+                onClick={() => {
+                  // Drawer will be connected in Part 5
+                  console.log("Open Notification Drawer");
+                }}
+              />
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
               {!isCustomerLoggedIn && (
                 <button
@@ -220,6 +279,10 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+      <NotificationDrawer
+        open={notificationOpen}
+        onClose={() => setNotificationOpen(false)}
+      />
     </header>
   );
 }

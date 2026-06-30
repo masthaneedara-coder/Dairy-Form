@@ -1,34 +1,54 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  addItemToCart,
+  getCartCount,
+  getCart,
+  removeCartItem,
+  increaseCartItemQty,
+  decreaseCartItemQty,
+  getCartTotal,
+} from "../config/cart";
+import {
+  isCustomerLoggedIn,
+  setRedirectAfterLogin,
+} from "../config/auth";
 
 export default function Cart() {
   const navigate = useNavigate();
+  const [cart, setCart] = useState([]);
 
-  const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
-  const initialCart = Array.isArray(savedCart) ? savedCart : [];
+  useEffect(() => {
+    setCart(getCart());
+  }, []);
 
-  const [cart, setCart] = useState(initialCart);
+  const total = useMemo(() => getCartTotal(), [cart]);
 
-  const updateCart = (newCart) => {
-    setCart(newCart);
-    localStorage.setItem("cart", JSON.stringify(newCart));
+  const totalItems = useMemo(
+    () => cart.reduce((sum, item) => sum + Number(item.qty || 0), 0),
+    [cart]
+  );
+
+  const handleIncrease = (index) => {
+    const updated = increaseCartItemQty(index);
+    setCart([...updated]);
   };
 
-  const total = cart.reduce(
-    (sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0),
-    0
-  );
+  const handleDecrease = (index) => {
+    const updated = decreaseCartItemQty(index);
+    setCart([...updated]);
+  };
 
-  const totalItems = cart.reduce(
-    (sum, item) => sum + Number(item.qty || 0),
-    0
-  );
+  const handleRemove = (index) => {
+    const updated = removeCartItem(index);
+    setCart([...updated]);
+  };
 
-  const proceedToCheckout = () => {
-    const isLoggedIn = localStorage.getItem("customerLogin") === "true";
+  const handleCheckout = () => {
+    if (cart.length === 0) return;
 
-    if (!isLoggedIn) {
-      localStorage.setItem("redirectAfterLogin", "/checkout");
+    if (!isCustomerLoggedIn()) {
+      setRedirectAfterLogin("/checkout");
       navigate("/auth");
       return;
     }
@@ -39,6 +59,7 @@ export default function Cart() {
   return (
     <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
       <div className="max-w-7xl mx-auto">
+        {/* PAGE TITLE */}
         <div className="text-center mb-6 sm:mb-8">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-green-700">
             🛒 Shopping Cart
@@ -100,16 +121,11 @@ export default function Cart() {
                       </div>
                     </div>
 
+                    {/* Qty + Remove */}
                     <div className="flex flex-col sm:items-end gap-3">
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => {
-                            const newCart = [...cart];
-                            if (newCart[index].qty > 1) {
-                              newCart[index].qty -= 1;
-                              updateCart(newCart);
-                            }
-                          }}
+                          onClick={() => handleDecrease(index)}
                           className="bg-red-500 text-white w-10 h-10 rounded-full text-xl font-bold"
                         >
                           -
@@ -120,11 +136,7 @@ export default function Cart() {
                         </span>
 
                         <button
-                          onClick={() => {
-                            const newCart = [...cart];
-                            newCart[index].qty += 1;
-                            updateCart(newCart);
-                          }}
+                          onClick={() => handleIncrease(index)}
                           className="bg-green-500 text-white w-10 h-10 rounded-full text-xl font-bold"
                         >
                           +
@@ -132,10 +144,7 @@ export default function Cart() {
                       </div>
 
                       <button
-                        onClick={() => {
-                          const newCart = cart.filter((_, i) => i !== index);
-                          updateCart(newCart);
-                        }}
+                        onClick={() => handleRemove(index)}
                         className="bg-red-600 text-white px-4 py-2 rounded-xl font-semibold w-full sm:w-auto"
                       >
                         Remove
@@ -172,18 +181,11 @@ export default function Cart() {
             </div>
 
             <button
-              onClick={proceedToCheckout}
+              onClick={handleCheckout}
               disabled={cart.length === 0}
               className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-2xl font-bold disabled:bg-gray-400"
             >
               Proceed To Checkout
-            </button>
-
-            <button
-              onClick={() => navigate("/subscription")}
-              className="w-full mt-3 bg-purple-100 hover:bg-purple-200 text-purple-700 py-3 rounded-2xl font-semibold"
-            >
-              Add Subscription
             </button>
 
             <button

@@ -5,10 +5,34 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
+import { NotificationProvider } from "./context/NotificationContext";
+import { NotificationPreferenceProvider } from "./context/NotificationPreferenceContext";
+import { ToastProvider } from "./context/ToastContext";
+
+import ToastContainer from "./components/ToastContainer";
+
 ReactDOM.createRoot(
   document.getElementById("root")
 ).render(
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>
+  <React.StrictMode>
+    <BrowserRouter>
+
+      <NotificationPreferenceProvider>
+
+        <ToastProvider>
+
+          <NotificationProvider>
+
+            <App />
+
+            <ToastContainer />
+
+          </NotificationProvider>
+
+        </ToastProvider>
+
+      </NotificationPreferenceProvider>
+
+    </BrowserRouter>
+  </React.StrictMode>
 );
