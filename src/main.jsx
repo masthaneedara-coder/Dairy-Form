@@ -9,7 +9,7 @@ import { NotificationProvider } from "./context/NotificationContext";
 import { NotificationPreferenceProvider } from "./context/NotificationPreferenceContext";
 import { ToastProvider } from "./context/ToastContext";
 
-import ToastContainer from "./components/ToastContainer";
+// import ToastContainer from "./components/ToastContainer";
 
 ReactDOM.createRoot(
   document.getElementById("root")
@@ -25,7 +25,7 @@ ReactDOM.createRoot(
 
             <App />
 
-            <ToastContainer />
+            {/* <ToastContainer /> */}
 
           </NotificationProvider>
 
