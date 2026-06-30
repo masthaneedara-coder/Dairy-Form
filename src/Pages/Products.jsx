@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchProducts } from "../config/api";
 import { addToCart, getCartItemCount } from "../config/cart";
 import { useSearchParams } from "react-router-dom";
-import Categories from "../components/home/Categories";
+import Categories from "../Components/home/Categories";
 import { PRODUCT_SIZES } from "../config/productSizes";
 
 const FALLBACK_IMAGE =
