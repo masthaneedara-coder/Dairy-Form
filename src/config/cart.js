@@ -1,11 +1,13 @@
-const CART_KEY = "cart";
+
 
 /* -----------------------------
    GET CART
 ----------------------------- */
 export function getCart() {
   try {
-    const cart = JSON.parse(localStorage.getItem(CART_KEY) || "[]");
+    const cart = JSON.parse(
+  localStorage.getItem(getCartKey()) || "[]"
+);
     return Array.isArray(cart) ? cart : [];
   } catch {
     return [];
@@ -16,7 +18,10 @@ export function getCart() {
    SAVE CART
 ----------------------------- */
 export function saveCart(cart) {
-  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+ localStorage.setItem(
+  getCartKey(),
+  JSON.stringify(cart)
+);
   window.dispatchEvent(new Event("cartUpdated"));
 }
 
@@ -102,7 +107,9 @@ export function decreaseCartItemQty(index) {
    CLEAR CART
 ----------------------------- */
 export function clearCart() {
-  localStorage.removeItem(CART_KEY);
+ localStorage.removeItem(getCartKey());
+  // Notify all components (Navbar, Cart, etc.)
+  window.dispatchEvent(new Event("cartUpdated"));
 }
 
 /* -----------------------------
@@ -126,4 +133,14 @@ export function getCartItemCount() {
 ----------------------------- */
 export function getCartCount() {
   return getCartItemCount();
+}
+
+function getCartKey() {
+  const customer = JSON.parse(
+    localStorage.getItem("customer")
+  );
+
+  return customer
+    ? `cart_${customer.id}`
+    : "guest_cart";
 }

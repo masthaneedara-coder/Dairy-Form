@@ -7,14 +7,18 @@ import {
   getCart,
   getCartItemCount,
 } from "../config/cart";
+import { getCurrentRole,} from "../config/auth";
+import { useAuthSession } from "../context/AuthSessionContext";
 
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
-
+const { customer, logout } = useAuthSession();
+const isCustomerLoggedIn = !!customer;
+const customerName =  customer?.name || "Customer";
+const role = getCurrentRole();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isCustomerLoggedIn, setIsCustomerLoggedIn] = useState(false);
-  const [customerName, setCustomerName] = useState("");
+ 
  const [cartCount, setCartCount] = useState(0);
 
 useEffect(() => {
@@ -34,40 +38,21 @@ useEffect(() => {
 
   const [notificationOpen, setNotificationOpen] = useState(false);
 
-  useEffect(() => {
-    const customerLogin = localStorage.getItem("customerLogin") === "true";
-    setIsCustomerLoggedIn(customerLogin);
-    setCustomerName(localStorage.getItem("customerName") || "Customer");
+ 
 
-    const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
-    const cart = Array.isArray(savedCart) ? savedCart : [];
-    const totalQty = cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
-    setCartCount(totalQty);
-
-    setMenuOpen(false);
-  }, [location.pathname]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("customerLogin");
-    localStorage.removeItem("customerName");
-    localStorage.removeItem("customerPhone");
-    localStorage.removeItem("customerAddress");
-    localStorage.removeItem("customerArea");
-    localStorage.removeItem("redirectAfterLogin");
-
-    setIsCustomerLoggedIn(false);
-    setCustomerName("");
-    navigate("/");
-  };
+  const handleLogout = async () => {
+  await logout();
+  navigate("/auth");
+};
 
   const goToSubscription = () => {
     if (!isCustomerLoggedIn) {
-      localStorage.setItem("redirectAfterLogin", "/subscription");
+      localStorage.setItem("redirectAfterLogin", "/subscription/create/:productId");
       window.dispatchEvent(new Event("cartUpdated"));
       navigate("/auth");
       return;
     }
-    navigate("/subscription");
+    navigate("/subscription/create/:productId");
   };
 
   return (
@@ -108,35 +93,66 @@ useEffect(() => {
               </div>
             </Link>
              <div className="hidden lg:flex items-center gap-2">
-              <Link
-                to="/"
-                className="px-4 py-3 rounded-2xl font-bold text-green-700 bg-green-50 hover:bg-green-100 transition"
-              >
-                Home
-              </Link>
+              {role === "customer" && (
+                  <>
+                    <Link
+                        to="/"
+                        className="px-4 py-3 rounded-2xl font-bold text-green-700 bg-green-50 hover:bg-green-100 transition"
+                      >
+                        Home
+                      </Link>
 
-              <Link
-                to="/products"
-                className="px-4 py-3 rounded-2xl font-semibold text-gray-700 hover:bg-green-50 hover:text-green-700 transition"
-              >
-                Products
-              </Link>
+                    <Link to="/products"                      
+                        className="px-4 py-3 rounded-2xl font-bold text-green-700 bg-green-50 hover:bg-green-100 transition"
+                      >Products</Link>
 
-              <button
-                onClick={goToSubscription}
-                className="px-4 py-3 rounded-2xl font-semibold text-gray-700 hover:bg-green-50 hover:text-green-700 transition"
-              >
-                Subscription
-              </button>
+                    <button className="px-4 py-3 rounded-2xl font-bold text-green-700 bg-green-50 hover:bg-green-100 transition"
+                     onClick={goToSubscription}>
+                      Subscription
+                    </button>
 
-              <Link
-                to="/order-history"
-                className="px-4 py-3 rounded-2xl font-semibold text-gray-700 hover:bg-green-50 hover:text-green-700 transition"
-              >
-                Orders
-              </Link>
-            </div>
+                    <Link className="px-4 py-3 rounded-2xl font-bold text-green-700 bg-green-50 hover:bg-green-100 transition"
+                     to="/order-history">
+                      Orders
+                    </Link>
+                  </>
+                )}
+                {role === "admin" && (
+                    <>
+                      <Link to="/admin">
+                        Dashboard
+                      </Link>
 
+                      <Link to="/admin/products">
+                        Products
+                      </Link>
+
+                      <Link to="/admin/orders">
+                        Orders
+                      </Link>
+
+                      <Link to="/admin/customers">
+                        Customers
+                      </Link>
+                    </>
+                  )}
+                  {role === "delivery" && (
+                    <>
+                      <Link to="/delivery">
+                        Dashboard
+                      </Link>
+
+                      <Link to="/delivery/orders">
+                        Orders
+                      </Link>
+
+                      <Link to="/delivery/history">
+                        History
+                      </Link>
+                    </>
+                  )}
+
+              </div>
             {/* RIGHT */}
             <NotificationBell
                 onClick={() => {
@@ -145,7 +161,7 @@ useEffect(() => {
                 }}
               />
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              {!isCustomerLoggedIn && (
+              {!role && (
                 <button
                   onClick={() => navigate("/auth")}
                   className="hidden sm:inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white px-4 py-2.5 rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5"
@@ -156,7 +172,7 @@ useEffect(() => {
 
               {isCustomerLoggedIn && (
                 <div className="hidden lg:flex bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm">
-                  👋 {customerName}
+                  👋 {customer?.name || "Customer"}
                 </div>
               )}
 
@@ -181,7 +197,7 @@ useEffect(() => {
             </div>
           </div>
 
-          {!isCustomerLoggedIn && (
+          {!role && (
             <div className="sm:hidden pb-3">
               <button
                 onClick={() => navigate("/auth")}

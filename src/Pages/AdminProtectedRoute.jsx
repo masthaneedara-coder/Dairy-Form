@@ -7,25 +7,30 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleAdminLogin = (e) => {
-    e.preventDefault();
+  const handleAdminLogin = async () => {
+  if (!loginId || !password) {
+    alert("Please enter Email and Password");
+    return;
+  }
 
-    const adminEmail = "admin@farmfresh.com";
-    const adminPassword = "123456";
+  try {
+    const admin = await adminLogin(loginId, password);
 
-    if (
-      email === adminEmail &&
-      password === adminPassword
-    ) {
-      localStorage.setItem("adminLogin", "true");
-      localStorage.setItem("userRole", "admin");
-      localStorage.setItem("adminName", "Admin");
+    setAdminLogin({
+      id: admin.id,
+      name: admin.full_name,
+      email: admin.email,
+      phone: admin.phone,
+      role: admin.role,
+    });
 
-      navigate("/admin");
-    } else {
-      alert("Invalid admin email or password");
-    }
-  };
+    navigate("/admin");
+
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Invalid admin credentials");
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 flex items-center justify-center px-4">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../Components/AdminLayout";
 import { fetchBilling, updateBillingStatus } from "../config/api";
+import InvoiceDrawer from "../components/admin/InvoiceDrawer";
 
 export default function AdminBilling() {
   const [billing, setBilling] = useState([]);
@@ -9,19 +10,27 @@ export default function AdminBilling() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [monthFilter, setMonthFilter] = useState("All");
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+
+const [invoiceOpen, setInvoiceOpen] = useState(false);
   
 
-  const loadBilling = async () => {
+const loadBilling = async () => {
   try {
     setLoading(true);
 
-    const data = await fetchBilling();
+    const rows = await fetchBilling();
 
-    const billRows = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.billing)
-      ? data.billing
-      : [];
+    const billRows = rows.map((bill) => ({
+  ...bill,
+
+  // Invoice
+  invoiceNumber: bill.invoice_number,
+  billingDate: bill.invoice_date,
+
+  // Customer
+
+}));
 
     setBilling(billRows);
   } catch (error) {
@@ -77,9 +86,11 @@ export default function AdminBilling() {
       (item) => String(item.billingStatus || "").toLowerCase() === "paid"
     ).length;
 
-    const unpaidCount = filteredBilling.filter(
-      (item) => String(item.billingStatus || "").toLowerCase() === "unpaid"
-    ).length;
+    const unpaidCount = filteredBilling.filter((item) => {
+      const status = String(item.billingStatus || "").toLowerCase();
+
+      return status === "pending" || status === "unpaid";
+    }).length;
 
     const inactiveCount = filteredBilling.filter(
       (item) => String(item.billingStatus || "").toLowerCase() === "inactive"
@@ -110,13 +121,7 @@ export default function AdminBilling() {
     const res = await updateBillingStatus(billId, newStatus);
 
     if (res.success) {
-      setBilling((prev) =>
-        prev.map((bill) =>
-          String(bill.id) === String(billId)
-            ? { ...bill, billingStatus: newStatus }
-            : bill
-        )
-      );
+    await loadBilling();
     } else {
       alert(res.message);
     }
@@ -370,7 +375,7 @@ export default function AdminBilling() {
                         Mark this month bill as paid or unpaid
                       </p>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                      <div className="flex flex-col md:flex-row gap-3 mt-4">
                         <button
                           onClick={() => updateBillingStatusLocal(bill.id, "Paid")}
                           className="bg-green-600 hover:bg-green-700 text-white py-3 rounded-2xl font-semibold text-sm"
@@ -384,6 +389,16 @@ export default function AdminBilling() {
                         >
                           Mark Unpaid
                         </button>
+                        <button
+                              onClick={() => {
+                                  setSelectedInvoice(bill);
+                                  setInvoiceOpen(true);
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-semibold"
+                          >
+                              👁 View Invoice
+                          </button>
+                          
                       </div>
                     </div>
                   </div>
@@ -393,6 +408,14 @@ export default function AdminBilling() {
           </div>
         )}
       </div>
+      <InvoiceDrawer
+    open={invoiceOpen}
+    bill={selectedInvoice}
+    onClose={() => {
+        setInvoiceOpen(false);
+        setSelectedInvoice(null);
+    }}
+    />
     </AdminLayout>
   );
 }

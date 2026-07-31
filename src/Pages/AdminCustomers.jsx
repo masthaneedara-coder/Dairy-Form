@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../Components/AdminLayout";
 import { fetchAllCustomers } from "../config/api";
+import { getAllCustomers } from "../services/adminCustomerService";
+import { useNavigate } from "react-router-dom";
 
 export default function AdminCustomers() {
+  const navigate = useNavigate();
   const SCRIPT_URL =
     "https://script.google.com/macros/s/AKfycbwLKt8d5VcS_uGmzk7t16EdgE7Qpx4crtitjxC6QWyJLde3RWtJuwRvIWWX3bXIM9UM/exec";
 
@@ -12,139 +15,22 @@ export default function AdminCustomers() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("All");
 
-  const loadCustomers = async () => {
-    try {
-      setLoading(true);
+async function loadCustomers() {
+  try {
+    setLoading(true);
 
-      const [ordersRes, subscriptionsRes] = await Promise.all([
-        fetch(`${SCRIPT_URL}?action=allOrders`),
-        fetch(`${SCRIPT_URL}?action=allSubscriptions`),
-      ]);
+    const data = await getAllCustomers();
 
-      const ordersData = await ordersRes.json();
-      const subscriptionsData = await subscriptionsRes.json();
+    console.log("Customers:", data);
 
-      const orders = Array.isArray(ordersData)
-        ? ordersData
-        : Array.isArray(ordersData?.orders)
-        ? ordersData.orders
-        : [];
+    setCustomers(data);
 
-      const subscriptions = Array.isArray(subscriptionsData)
-        ? subscriptionsData
-        : Array.isArray(subscriptionsData?.subscriptions)
-        ? subscriptionsData.subscriptions
-        : [];
-
-      const customerMap = new Map();
-
-      const getOrCreateCustomer = (phone, fallback = {}) => {
-        const key = String(phone || "").trim();
-        if (!key) return null;
-
-        if (!customerMap.has(key)) {
-          customerMap.set(key, {
-            id: key,
-            name: fallback.customerName || fallback.name || "Customer",
-            phone: key,
-            area: fallback.area || "-",
-            address: fallback.address || "-",
-            totalOrders: 0,
-            totalSpent: 0,
-            totalSubscriptions: 0,
-            activeSubscriptions: 0,
-            latestOrderDate: "",
-            latestSubscriptionDate: "",
-            orders: [],
-            subscriptions: [],
-          });
-        }
-
-        return customerMap.get(key);
-      };
-
-      // Build from orders
-      orders.forEach((order) => {
-        const phone = order.phone || order.mobile || "";
-        const customer = getOrCreateCustomer(phone, order);
-        if (!customer) return;
-
-        customer.name =
-          customer.name === "Customer"
-            ? order.customerName || order.name || customer.name
-            : customer.name;
-
-        if (customer.area === "-" && order.area) customer.area = order.area;
-        if (customer.address === "-" && order.address)
-          customer.address = order.address;
-
-        customer.totalOrders += 1;
-        customer.totalSpent += Number(
-          order.amount || order.totalAmount || order.total || 0
-        );
-
-        customer.orders.push(order);
-
-        if (order.date) {
-          if (
-            !customer.latestOrderDate ||
-            new Date(order.date).getTime() > new Date(customer.latestOrderDate).getTime()
-          ) {
-            customer.latestOrderDate = order.date;
-          }
-        }
-      });
-
-      // Build from subscriptions
-      subscriptions.forEach((sub) => {
-        const phone = sub.phone || sub.mobile || "";
-        const customer = getOrCreateCustomer(phone, sub);
-        if (!customer) return;
-
-        customer.name =
-          customer.name === "Customer"
-            ? sub.customerName || sub.name || customer.name
-            : customer.name;
-
-        if (customer.area === "-" && sub.area) customer.area = sub.area;
-        if (customer.address === "-" && sub.address)
-          customer.address = sub.address;
-
-        customer.totalSubscriptions += 1;
-
-        const status = String(sub.status || "Active").toLowerCase();
-        if (status === "active") {
-          customer.activeSubscriptions += 1;
-        }
-
-        customer.subscriptions.push(sub);
-
-        const subDate = sub.date || sub.startDate || "";
-        if (subDate) {
-          if (
-            !customer.latestSubscriptionDate ||
-            new Date(subDate).getTime() >
-              new Date(customer.latestSubscriptionDate).getTime()
-          ) {
-            customer.latestSubscriptionDate = subDate;
-          }
-        }
-      });
-
-      const finalCustomers = Array.from(customerMap.values()).sort((a, b) => {
-        const aTime = new Date(a.latestOrderDate || a.latestSubscriptionDate || 0).getTime();
-        const bTime = new Date(b.latestOrderDate || b.latestSubscriptionDate || 0).getTime();
-        return bTime - aTime;
-      });
-
-      setCustomers(finalCustomers);
-    } catch (error) {
-      console.error("Failed to load customers:", error);
-      setCustomers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}
 
   useEffect(() => {
     loadCustomers();
@@ -408,12 +294,24 @@ export default function AdminCustomers() {
                       </p>
                     </div>
                   </div>
+                  {/* ACTIONS */}
+                    <div className="flex justify-end mt-5">
+                      <button
+                        onClick={() => navigate(`/admin/customers/${customer.id}`)}
+                        className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-xl font-bold"
+                      >
+                        👁 View Details
+                      </button>
+                    </div>
                 </div>
               </div>
             ))}
           </div>
         )}
+        
+        
       </div>
+     
     </AdminLayout>
   );
 }

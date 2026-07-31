@@ -1,83 +1,81 @@
 import { useState } from "react";
+import { forgotPassword } from "../config/api";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../firebase";
-import { sendPasswordResetEmail } from "firebase/auth";
 
 export default function ForgotPassword() {
+
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
 
-  const handleSubmit = async () => {
-  if (!email) {
-    alert("Please enter your registered email.");
-    return;
-  }
+  const [loading, setLoading] = useState(false);
 
-  try {
-    await sendPasswordResetEmail(auth, email);
+  async function handleSubmit(e) {
 
-    alert(
-      "Password reset email has been sent. Please check your inbox."
-    );
+    e.preventDefault();
 
-    navigate("/auth");
+    try {
 
-  } catch (error) {
-    console.error(error);
+      setLoading(true);
 
-    switch (error.code) {
-      case "auth/user-not-found":
-        alert("No account found with this email.");
-        break;
+      const res =
+        await forgotPassword(email);
 
-      case "auth/invalid-email":
-        alert("Invalid email address.");
-        break;
+      alert(res.message);
 
-      default:
-        alert(error.message);
+      navigate("/auth");
+
+    } catch (err) {
+
+      alert(err.message);
+
+    } finally {
+
+      setLoading(false);
+
     }
+
   }
-};
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-green-50">
 
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-xl p-8">
+    <div className="min-h-screen flex justify-center items-center bg-gray-100">
 
-        <h1 className="text-3xl font-black text-green-700 text-center">
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md">
+
+        <h1 className="text-3xl font-bold mb-6">
           Forgot Password
         </h1>
 
-        <p className="text-center text-gray-500 mt-2">
-          Enter your registered mobile number.
-        </p>
-
-        <input
-          type="email"
-          placeholder="Email Address"
-         value={email}
-         onChange={(e) => setEmail(e.target.value)}
-          className="w-full mt-8 border rounded-xl px-4 py-3"
-        />
-
-        <button
-          onClick={handleSubmit}
-          className="w-full mt-6 bg-green-600 text-white rounded-xl py-3 font-bold hover:bg-green-700"
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5"
         >
-          Continue
-        </button>
 
-        <button
-          onClick={() => navigate("/auth")}
-          className="w-full mt-3"
-        >
-          Back to Login
-        </button>
+          <input
+            type="email"
+            placeholder="Registered Email"
+            value={email}
+            onChange={(e)=>setEmail(e.target.value)}
+            className="w-full border rounded-lg p-3"
+            required
+          />
+
+          <button
+            className="w-full bg-blue-600 text-white rounded-lg p-3"
+            disabled={loading}
+          >
+            {loading
+              ? "Sending..."
+              : "Send Reset Link"}
+          </button>
+
+        </form>
 
       </div>
 
     </div>
+
   );
+
 }

@@ -1,38 +1,64 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../Components/AdminLayout";
+
 import {
-  fetchAllSubscriptions,
+  getAllSubscriptions,
   updateSubscriptionStatus,
-} from "../config/api";
+  getDeliverySummary
+} from "../services/adminSubscriptionService";
+
 
 export default function AdminSubscriptions() {
   
   const [subscriptions, setSubscriptions] = useState([]);
+  const [deliverySummary, setDeliverySummary] =  useState({});
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const loadSubscriptions = async () => {
+  async function loadSubscriptions() {
   try {
     setLoading(true);
 
-    const data = await fetchAllSubscriptions();
+    console.log("Loading started");
 
-    const list = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.subscriptions)
-      ? data.subscriptions
-      : [];
+    const data = await getAllSubscriptions();
 
-    setSubscriptions(list);
-  } catch (error) {
-    console.error("Failed to load subscriptions:", error);
-    setSubscriptions([]);
+    console.log("API Data:", data);
+
+    setSubscriptions(data);
+    for (const sub of data) {
+      const id = sub.subscriptionId || sub.id;
+
+      if (id) {
+        loadDeliverySummary(id);
+      }
+    }
+
+  } catch (err) {
+    console.error(err);
   } finally {
+    console.log("Loading finished");
     setLoading(false);
   }
-};
+}
+async function loadDeliverySummary(subscriptionId) {
+  try {
+    console.log("Loading summary for:", subscriptionId);
+
+    const summary = await getDeliverySummary(subscriptionId);
+
+    console.log("Summary Response:", summary);
+
+    setDeliverySummary((prev) => ({
+      ...prev,
+      [subscriptionId]: summary,
+    }));
+  } catch (err) {
+    console.error("Delivery Summary Error:", err);
+  }
+}
 
   useEffect(() => {
     loadSubscriptions();
@@ -148,30 +174,31 @@ export default function AdminSubscriptions() {
     };
   };
 
-  const updateStatusLocal = async (subscriptionId, newStatus) => {
+  const updateStatusLocal = async (
+  subscriptionId,
+  newStatus
+) => {
   try {
-    const res = await updateSubscriptionStatus(
+    await updateSubscriptionStatus(
       subscriptionId,
       newStatus
     );
 
-    if (res.success) {
-      setSubscriptions((prev) =>
-        prev.map((sub) =>
-          String(sub.subscriptionId || sub.id) ===
-          String(subscriptionId)
-            ? { ...sub, status: newStatus }
-            : sub
-        )
-      );
-    } else {
-      alert(res.message);
-    }
+    setSubscriptions((prev) =>
+      prev.map((sub) =>
+        String(sub.subscriptionId || sub.id) ===
+        String(subscriptionId)
+          ? { ...sub, status: newStatus }
+          : sub
+      )
+    );
+
   } catch (err) {
     console.error(err);
     alert("Unable to update subscription");
   }
 };
+
 
   return (
     <AdminLayout title="Subscriptions">
@@ -283,6 +310,14 @@ export default function AdminSubscriptions() {
             {filteredSubscriptions.map((sub, index) => {
               const statusStyle = getStatusStyle(sub.status || "Active");
               const subscriptionId = sub.subscriptionId || sub.id || `SUB-${index + 1}`;
+              const summary =
+                    deliverySummary[subscriptionId] || {
+                      delivered: 0,
+                      outForDelivery: 0,
+                      pending: 0,
+                      missed: 0,
+                      total: 0,
+                    };
               const monthlyAmount =
                 sub.monthlyAmount || sub.price || sub.amount || 0;
 
@@ -293,7 +328,7 @@ export default function AdminSubscriptions() {
                 >
                   <div className="flex flex-col gap-4">
                     {/* TOP */}
-                    <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
                           <h2 className="text-lg sm:text-2xl font-black text-green-700 break-words">
@@ -326,7 +361,7 @@ export default function AdminSubscriptions() {
                     </div>
 
                     {/* CUSTOMER + PLAN INFO */}
-                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <InfoBox label="Phone" value={sub.phone || sub.mobile || "-"} />
                       <InfoBox label="Product" value={sub.product || "-"} />
                       <InfoBox label="Quantity" value={sub.qty || "-"} />
@@ -342,7 +377,7 @@ export default function AdminSubscriptions() {
                     </div>
 
                     {/* DATES */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       <InfoBox
                         label="Start Date"
                         value={formatDate(sub.startDate || sub.date)}
@@ -355,7 +390,7 @@ export default function AdminSubscriptions() {
                     </div>
 
                     {/* SUMMARY + ACTIONS */}
-                    <div className="grid xl:grid-cols-[1fr_360px] gap-4">
+                    <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px_360px] gap-4">
                       <div className="rounded-3xl border border-green-100 bg-green-50 p-4 sm:p-5">
                         <h3 className="text-lg sm:text-xl font-black text-green-700">
                           Subscription Summary
@@ -390,6 +425,37 @@ export default function AdminSubscriptions() {
                           </div>
                         </div>
                       </div>
+                      <div className="rounded-3xl border border-blue-100 bg-blue-50 p-5 mt-4">
+
+                        <h3 className="text-lg font-bold text-blue-700 mb-4">
+                          Delivery Summary
+                        </h3>
+
+                       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+
+                          <InfoBox
+                            label="Delivered"
+                            value={summary.delivered}
+                          />
+
+                          <InfoBox
+                            label="Out For Delivery"
+                            value={summary.outForDelivery}
+                          />
+
+                          <InfoBox
+                            label="Pending"
+                            value={summary.pending}
+                          />
+
+                          <InfoBox
+                            label="Missed"
+                            value={summary.missed}
+                          />
+
+                        </div>
+
+                      </div>
 
                       <div className="rounded-3xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
                         <h3 className="text-lg font-black text-slate-800">
@@ -399,7 +465,7 @@ export default function AdminSubscriptions() {
                           Pause, activate or stop this customer plan
                         </p>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3 mt-4">
+                        <div className="grid grid-cols-3 xl:grid-cols-1 gap-2 mt-4">
                           <button
                             onClick={() =>
                               updateStatusLocal(subscriptionId, "Active")
@@ -468,11 +534,16 @@ function StatCard({ title, value, color = "green", icon = "🔁" }) {
 
 function InfoBox({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 min-w-0">
-      <p className="text-xs sm:text-sm text-slate-500 font-medium">{label}</p>
-      <h3 className="text-sm sm:text-lg font-black text-slate-800 mt-1 break-words">
+    <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 text-center">
+
+      <p className="text-[11px] sm:text-sm text-gray-500 font-medium">
+        {label}
+      </p>
+
+      <h3 className="text-lg sm:text-xl font-bold text-slate-800 mt-2 break-words">
         {value}
       </h3>
+
     </div>
   );
 }

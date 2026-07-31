@@ -1,20 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-import { placeOrder } from "../config/api";
-import { getCart, getCartTotal, clearCart } from "../config/cart";
+import {
+  fetchCart,
+  placeOrder,
+} from "../config/api";
 import {
   getCustomerName,
   getCustomerPhone,
-  isCustomerLoggedIn,
 } from "../config/auth";
+
+import { useAuthSession } from "../context/AuthSessionContext";
 import { PAYMENT_METHODS } from "../config/appConfig";
 import { useNotifications } from "../context/NotificationContext";
-
+import { createOrder } from "../services/orderService";
+import {
+  fetchCustomerAddresses,createAddress,
+} from "../config/api";
+import AddressForm from "../components/AddressForm";
+import { clearCart } from "../config/cart";
 
 
 export default function Checkout() {
   const navigate = useNavigate();
+  const { customer } = useAuthSession();
 
   const [cart, setCart] = useState([]);
   const [customerName, setCustomerName] = useState("");
@@ -24,27 +32,61 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS.COD);
   const [loading, setLoading] = useState(false);
   const { addNotification } = useNotifications();
+  const [addresses, setAddresses] = useState([]);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+
+const [selectedAddress, setSelectedAddress] =
+  useState(null);
   
 
   useEffect(() => {
-    if (!isCustomerLoggedIn()) {
-      navigate("/auth");
-      return;
-    }
+  if (!customer) {
+    navigate("/auth");
+    return;
+  }
 
-    const currentCart = getCart();
+ const loadCart = async () => {
+  try {
+    console.log("1. Customer:", customer);
 
-    if (!currentCart.length) {
+    const customerId = customer.id;
+    console.log("2. Customer ID:", customerId);
+
+    const res = await fetchCart(customerId);
+    console.log("Checkout API Response:", res);
+console.log("Cart Length:", res?.cart?.length);
+    console.log("3. API Response:", res);
+
+    const cartItems = res.cart || [];
+    console.log("4. Cart Items:", cartItems);
+
+    setCart(cartItems);
+
+    if (cartItems.length === 0) {
+      console.log("5. Cart is empty");
       navigate("/cart");
-      return;
     }
+  } catch (err) {
+    console.error("Checkout Error:", err);
+  }
+};
+  loadCart();
+  loadAddresses();
 
-    setCart(currentCart);
-    setCustomerName(getCustomerName());
-    setPhone(getCustomerPhone());
-  }, [navigate]);
+  setCustomerName(getCustomerName());
+  setPhone(getCustomerPhone());
 
-  const subtotal = useMemo(() => getCartTotal(), [cart]);
+}, [navigate, customer]);
+
+  const subtotal = useMemo(() => {
+  return cart.reduce(
+    (sum, item) =>
+      sum +
+      Number(item.price || item.products?.price || 0) *
+        Number(item.quantity || 0),
+      0
+    );
+  }, [cart]);
 
     const gst = useMemo(() => {
       return paymentMethod === PAYMENT_METHODS.ONLINE
@@ -56,7 +98,7 @@ export default function Checkout() {
       return +(subtotal + gst).toFixed(2);
     }, [subtotal, gst]);
     const totalItems = useMemo(() => {
-  return cart.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+  return cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
 }, [cart]);
 
     const openRazorpay = () => {
@@ -90,12 +132,68 @@ export default function Checkout() {
 
   razor.open();
 };
+async function loadAddresses() {
+  try {
+    const customer = JSON.parse(
+      localStorage.getItem("customer")
+    );
 
-  const handlePlaceOrder = async (paymentId = "") => {
-    if (!customerName || !phone || !address) {
-      alert("Please fill customer name, phone and address");
-      return;
+    if (!customer?.id) return;
+
+    const res = await fetchCustomerAddresses(customer.id);
+
+    const list = res.addresses || [];
+
+    setAddresses(list);
+
+    // Auto-select the default address
+    setSelectedAddress((current) => {
+      if (current) {
+        const updated = list.find(a => a.id === current.id);
+        if (updated) return updated;
+      }
+
+      return (
+        list.find(a => a.is_default) ||
+        list[0] ||
+        null
+      );
+    });
+
+    
+
+  } catch (err) {
+    console.error("Failed to load addresses:", err);
+  }
+}
+async function handleSaveAddress(addressData) {
+  try {
+    const res = await createAddress(addressData);
+
+    await loadAddresses();
+
+    // Automatically select the newly created address
+    if (res?.address) {
+      setSelectedAddress(res.address);
     }
+
+    setShowAddressForm(false);
+
+  } catch (err) {
+    console.error(err);
+    alert(err.message || "Failed to save address.");
+  }
+}
+  const handlePlaceOrder = async (paymentId = "") => {
+    if (!customerName || !phone) {
+  alert("Please fill customer name and phone.");
+  return;
+}
+
+if (!selectedAddress) {
+  alert("Please select a delivery address.");
+  return;
+}
     if (typeof paymentId !== "string") {
     paymentId = "";
     }
@@ -112,40 +210,50 @@ export default function Checkout() {
 
     try {
       setLoading(true);
+     
+      const customerId = customer.id;
 
-      const payload = {
-        customerName,
-        phone,
-        address,
-        area,
-        paymentMethod,
-        items: cart.map((item) => ({
-          name: item.name,
-          qty: item.qty,
-          price: item.price,
-          size: item.size,
-        })),
-        subtotal,
-          gst,
-          totalAmount: total,
-          paymentId,
-          paymentStatus:
-            paymentMethod === PAYMENT_METHODS.ONLINE
-              ? (paymentId ? "Paid" : "Pending")
-              : "Pending",
+        const payload = {
+         order: {
+            customer_id: customerId,
 
-                };
+            address_id: selectedAddress.id,
 
-      const result = await placeOrder(payload);
+            customer_name: customerName,
+            phone,
+
+            payment_method: paymentMethod,
+            payment_status:
+              paymentMethod === PAYMENT_METHODS.ONLINE
+                ? "Paid"
+                : "Pending",
+
+            status: "Pending",
+
+            subtotal,
+            delivery_charge: 0,
+            discount: 0,
+            total_amount: total,
+            notes: "",
+        },
+          items: cart.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price:
+              item.price * item.quantity,
+            size: item.size,
+          })),
+        };
+
+      const result = await createOrder(payload);
 
       if (result.success) {
         if (paymentMethod === PAYMENT_METHODS.WHATSAPP) {
           const itemsText = cart
             .map(
               (item) =>
-                `${item.name} (${item.size}) x ${item.qty} = ₹${
-                  Number(item.price || 0) * Number(item.qty || 0)
-                }`
+                `${item.products?.name} (${item.size}) x ${item.quantity}`
             )
             .join("%0A");
 
@@ -170,9 +278,13 @@ export default function Checkout() {
           type: "order",
           priority: "high",
         });
+         clearCart();
+
+    // Clear local state
+         setCart([]);
 
 
-        clearCart();
+       
         alert("Order placed successfully");
         navigate("/order-history");
       } else {
@@ -186,10 +298,7 @@ export default function Checkout() {
     }
   };
   
-  
-
-   
-
+console.log("Checkout Cart:", cart);
   return (
     <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
       <div className="max-w-7xl mx-auto">
@@ -249,19 +358,93 @@ export default function Checkout() {
                   placeholder="Enter area"
                 />
               </div>
+              <div className="bg-white rounded-2xl border p-5 mb-6">
 
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Address
-                </label>
-                <textarea
-                  rows={4}
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full border border-green-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-400"
-                  placeholder="House No, Street, Landmark..."
-                />
-              </div>
+                  <div className="flex items-center justify-between mb-4">
+
+                    <div>
+                      <h3 className="text-lg font-bold">
+                        Delivery Address
+                      </h3>
+
+                      <p className="text-gray-500 text-sm">
+                        Select where you want your order delivered
+                      </p>
+                    </div>
+
+                  </div>
+
+                  {addresses.length === 0 ? (
+
+                    <div className="text-center py-8">
+
+                      <p className="text-gray-500 mb-4">
+                        No saved addresses found.
+                      </p>
+
+                      <button
+                          type="button"
+                          onClick={() => setShowAddressForm(true)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+                        >
+                          + Add Address
+                        </button>
+
+                    </div>
+
+                  ) : (
+
+                    <div className="space-y-4">
+
+                      {addresses.map((address) => (
+
+                        <div
+                          key={address.id}
+                          onClick={() => setSelectedAddress(address)}
+                          className={`cursor-pointer rounded-xl border-2 p-4 transition ${
+                            selectedAddress?.id === address.id
+                              ? "border-green-600 bg-green-50"
+                              : "border-gray-200 hover:border-green-400"
+                          }`}
+                        >
+
+                          <div className="flex justify-between">
+
+                            <h4 className="font-semibold">
+                              {address.house_no}
+                            </h4>
+
+                            {address.is_default && (
+                              <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">
+                                Default
+                              </span>
+                            )}
+
+                          </div>
+
+                          <p className="text-gray-600 mt-2">
+                            {address.street}
+                          </p>
+
+                          <p className="text-gray-600">
+                            {address.area}, {address.city}
+                          </p>
+
+                          <p className="text-gray-600">
+                            {address.state} - {address.pincode}
+                          </p>
+
+                        </div>
+
+                      ))}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+             
             </div>
 
             {/* PAYMENT */}
@@ -327,20 +510,20 @@ export default function Checkout() {
                 >
                   <div className="flex gap-3">
                     <img
-                      src={item.image}
-                      alt={item.name}
+                      src={item.products?.image}
+                      alt={item.products?.name}
                       className="w-16 h-16 rounded-2xl object-cover"
                     />
 
                     <div className="min-w-0 flex-1">
                       <h3 className="font-bold text-green-800 line-clamp-1">
-                        {item.name}
+                        {item.products?.name}
                       </h3>
                       <p className="text-sm text-gray-500 mt-1">
-                        {item.size} × {item.qty}
+                        {item.size} × {item.quantity}
                       </p>
                       <p className="text-green-700 font-black mt-1">
-                        ₹{Number(item.price || 0) * Number(item.qty || 0)}
+                        ₹{Number(item.products?.price || item.price || 0) * Number(item.quantity || 0)}
                       </p>
                     </div>
                   </div>
@@ -395,6 +578,15 @@ export default function Checkout() {
             >
               ← Back To Cart
             </button>
+            {showAddressForm && (
+              <AddressForm
+                customerId={
+                  JSON.parse(localStorage.getItem("customer"))?.id
+                }
+                onSave={handleSaveAddress}
+                onCancel={() => setShowAddressForm(false)}
+              />
+            )}
           </div>
         </div>
       </div>

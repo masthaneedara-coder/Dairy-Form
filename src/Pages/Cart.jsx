@@ -1,60 +1,91 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  addItemToCart,
-  getCartCount,
-  getCart,
-  removeCartItem,
-  increaseCartItemQty,
-  decreaseCartItemQty,
-  getCartTotal,
-} from "../config/cart";
+
 import {
   isCustomerLoggedIn,
   setRedirectAfterLogin,
 } from "../config/auth";
+import {
+  fetchCart,
+  deleteCartItem,
+  updateCartItem,
+} from "../config/api";
+
+import { useAuthSession } from "../context/AuthSessionContext";
 
 export default function Cart() {
   const navigate = useNavigate();
   const [cart, setCart] = useState([]);
+  const { customer } = useAuthSession();
 
+const loadCart = async () => {
+  try {
+    if (!customer) return;
+
+    const res = await fetchCart(customer.id);
+
+    console.log("Cart:", res);
+
+    setCart(res.cart || []);
+  } catch (err) {
+    console.error(err);
+  }
+};
   useEffect(() => {
-    setCart(getCart());
-  }, []);
+  if (customer) {
+    loadCart();
+  }
+}, [customer]);
 
-  const total = useMemo(() => getCartTotal(), [cart]);
+  const total = useMemo(() => {
+  return cart.reduce(
+    (sum, item) =>
+      sum +
+      Number(item.price || item.products?.price || 0) *
+      Number(item.quantity || item.qty || 0),
+    0
+  );
+}, [cart]);
 
   const totalItems = useMemo(
-    () => cart.reduce((sum, item) => sum + Number(item.qty || 0), 0),
+    () => cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
     [cart]
   );
 
-  const handleIncrease = (index) => {
-    const updated = increaseCartItemQty(index);
-    setCart([...updated]);
-  };
+ const handleIncrease = async (item) => {
+  await updateCartItem(item.id, item.quantity + 1);
 
-  const handleDecrease = (index) => {
-    const updated = decreaseCartItemQty(index);
-    setCart([...updated]);
-  };
+  loadCart();
+};
 
-  const handleRemove = (index) => {
-    const updated = removeCartItem(index);
-    setCart([...updated]);
-  };
+  const handleDecrease = async (item) => {
+  if (item.quantity <= 1) return;
 
-  const handleCheckout = () => {
-    if (cart.length === 0) return;
+  await updateCartItem(item.id, item.quantity - 1);
 
-    if (!isCustomerLoggedIn()) {
-      setRedirectAfterLogin("/checkout");
-      navigate("/auth");
-      return;
-    }
+  loadCart();
+};
+ const handleRemove = async (item) => {
+  try {
+    await deleteCartItem(item.id);
 
-    navigate("/checkout");
-  };
+    await loadCart();
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+ const handleCheckout = () => {
+  if (cart.length === 0) return;
+
+  if (!isCustomerLoggedIn()) {
+    setRedirectAfterLogin("/checkout");
+    navigate("/auth");
+    return;
+  }
+
+  navigate("/checkout");
+};
 
   return (
     <div className="min-h-screen bg-slate-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
@@ -91,20 +122,20 @@ export default function Cart() {
             {cart.length > 0 &&
               cart.map((item, index) => (
                 <div
-                  key={index}
+                  key={item.id}
                   className="bg-white rounded-3xl shadow-md p-4 sm:p-5"
                 >
                   <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
                     <div className="flex gap-4">
                       <img
-                        src={item.image}
-                        alt={item.name}
+                        src={item.products?.image}
+                        alt={item.products?.name}
                         className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover flex-shrink-0"
                       />
 
                       <div className="min-w-0">
                         <h2 className="font-bold text-lg sm:text-xl break-words">
-                          {item.name}
+                          {item.products?.name}
                         </h2>
 
                         <p className="text-gray-500 mt-1">
@@ -112,11 +143,14 @@ export default function Cart() {
                         </p>
 
                         <p className="text-green-600 font-bold text-lg mt-1">
-                          ₹{item.price}
+                          ₹{item.price || item.products?.price}
                         </p>
 
                         <p className="text-sm text-gray-500 mt-1">
-                          Total: ₹{Number(item.price || 0) * Number(item.qty || 0)}
+                          Total: ₹{
+                                Number(item.price || item.products?.price || 0) *
+                                Number(item.quantity || 0)
+                              }
                         </p>
                       </div>
                     </div>
@@ -125,18 +159,18 @@ export default function Cart() {
                     <div className="flex flex-col sm:items-end gap-3">
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => handleDecrease(index)}
+                          onClick={() => handleDecrease(item)}
                           className="bg-red-500 text-white w-10 h-10 rounded-full text-xl font-bold"
                         >
                           -
                         </button>
 
                         <span className="font-bold text-lg min-w-[28px] text-center">
-                          {item.qty}
+                          {item.quantity}
                         </span>
 
                         <button
-                          onClick={() => handleIncrease(index)}
+                          onClick={() => handleIncrease(item)}
                           className="bg-green-500 text-white w-10 h-10 rounded-full text-xl font-bold"
                         >
                           +
@@ -144,7 +178,7 @@ export default function Cart() {
                       </div>
 
                       <button
-                        onClick={() => handleRemove(index)}
+                        onClick={() => handleRemove(item)}
                         className="bg-red-600 text-white px-4 py-2 rounded-xl font-semibold w-full sm:w-auto"
                       >
                         Remove

@@ -1,91 +1,129 @@
-const SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbx5VITEDtGfbCs18q2Gqz30T2P-ba1sbnAiWpNqIQ2AEz5QLLrtaPHU-FQxLFnyclPC/exec";
-
+const API_URL = "http://localhost:5000/api";
 /* ---------------------------------------
    COMMON HELPERS
 --------------------------------------- */
-async function getJSON(url) {
-  const res = await fetch(url, {
-    method: "GET",
-  });
+export async function getJSON(url) {
+  const res = await fetch(url);
 
   if (!res.ok) {
-    throw new Error(`GET failed: ${res.status}`);
+    throw new Error(await res.text());
   }
 
   return await res.json();
 }
 
-async function postJSON(body) {
-  const response = await fetch(SCRIPT_URL, {
+export async function postJSON(url, body) {
+  const res = await fetch(url, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
   });
 
-  if (!response.ok) {
-    throw new Error(`POST failed: ${response.status}`);
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Request failed");
   }
 
-  return await response.json();
+  return data;
+}
+export async function putJSON(url, body) {
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Request failed");
+  }
+
+  return data;
 }
 
+export async function deleteJSON(url) {
+  const res = await fetch(url, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  return await res.json();
+}
+
+export async function patchJSON(url, body) {
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || "Request failed");
+  }
+
+  return data;
+}
 /* ---------------------------------------
    PRODUCTS
 --------------------------------------- */
 export async function fetchProducts() {
   try {
-    const data = await getJSON(`${SCRIPT_URL}?action=products`);
-
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.products)) return data.products;
-    if (Array.isArray(data?.data)) return data.data;
-
-    return [];
-  } catch (error) {
-    console.error("fetchProducts error:", error);
+    const data = await getJSON(`${API_URL}/products`);
+    return data.products || [];
+  } catch (err) {
+    console.error(err);
     return [];
   }
 }
-
+export async function fetchProduct(id) {
+  return await getJSON(
+    `${API_URL}/products/${id}`
+  );
+}
+export async function fetchCategories() {
+  const data = await getJSON(`${API_URL}/categories`);
+  return data.categories || [];
+}
 /* ---------------------------------------
    PLACE PRODUCT ORDER
 --------------------------------------- */
-export async function placeOrder(orderPayload) {
-  try {
-    const payload = {
-      action: "placeOrder",
-      ...orderPayload,
-    };
+// export async function placeOrder(orderPayload) {
+//   try {
+//     const payload = {
+//       action: "placeOrder",
+//       ...orderPayload,
+//     };
 
-    return await postJSON(payload);
-  } catch (error) {
-    console.error("placeOrder error:", error);
-    return {
-      success: false,
-      message: "Failed to place order",
-    };
-  }
-}
+//     return await postJSON(payload);
+//   } catch (error) {
+//     console.error("placeOrder error:", error);
+//     return {
+//       success: false,
+//       message: "Failed to place order",
+//     };
+//   }
+// }
 
 /* ---------------------------------------
    CUSTOMER ORDERS
 --------------------------------------- */
-export async function fetchOrdersByPhone(phone) {
-  try {
-    if (!phone) return [];
-
-    const data = await getJSON(
-      `${SCRIPT_URL}?action=orders&phone=${encodeURIComponent(phone)}`
-    );
-
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.orders)) return data.orders;
-
-    return [];
-  } catch (error) {
-    console.error("fetchOrdersByPhone error:", error);
-    return [];
-  }
+export async function fetchCustomerOrders(customerId) {
+  return await getJSON(
+    `${API_URL}/orders/customer/${customerId}`
+  );
 }
 
 /* ---------------------------------------
@@ -125,25 +163,6 @@ export async function fetchSubscriptionsByPhone(phone) {
     return [];
   }
 }
-
-export async function updateSubscriptionStatus(subscriptionId, status) {
-  try {
-    const payload = {
-      action: "updateSubscriptionStatus",
-      subscriptionId,
-      status,
-    };
-
-    return await postJSON( payload);
-  } catch (error) {
-    console.error("updateSubscriptionStatus error:", error);
-    return {
-      success: false,
-      message: "Failed to update subscription status",
-    };
-  }
-}
-
 /* ---------------------------------------
    ADMIN - ORDERS
 --------------------------------------- */
@@ -167,23 +186,23 @@ export async function fetchAllOrders() {
 
 export async function updateOrderStatus(orderId, status) {
   try {
-    const response = await fetch(SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "updateDeliveryStatus",
-        orderId,
-        status,
-      }),
-    });
 
-    return await response.json();
+    return await putJSON(
+      `${API_URL}/orders/${orderId}/status`,
+      {
+        status,
+      }
+    );
+
   } catch (error) {
-    console.error("updateOrderStatus:", error);
+
+    console.error(error);
 
     return {
       success: false,
       message: "Unable to update status.",
     };
+
   }
 }
 
@@ -226,10 +245,14 @@ export async function fetchAllCustomers() {
 --------------------------------------- */
 export async function fetchBilling() {
   try {
-    const data = await getJSON(`${SCRIPT_URL}?action=billing`);
+    const data = await getJSON(`${API_URL}/billing`);
+
+    console.log("Billing API:", data);
 
     if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.billing)) return data.billing;
+    if (Array.isArray(data.billing)) return data.billing;
+    if (Array.isArray(data.bills)) return data.bills;
+    if (Array.isArray(data.data)) return data.data;
 
     return [];
   } catch (error) {
@@ -238,17 +261,29 @@ export async function fetchBilling() {
   }
 }
 
-export async function updateBillingStatus(subscriptionId, billingStatus) {
+export async function updateBillingStatus(billId, paymentStatus) {
   try {
-    const payload = {
-      action: "updateBillingStatus",
-      subscriptionId,
-      billingStatus,
-    };
+    const response = await fetch(
+      `${API_URL}/billing/${billId}/status`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          paymentStatus,
+        }),
+      }
+    );
 
-    return await postJSON( payload);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.json();
   } catch (error) {
     console.error("updateBillingStatus error:", error);
+
     return {
       success: false,
       message: "Failed to update billing status",
@@ -259,16 +294,19 @@ export async function updateBillingStatus(subscriptionId, billingStatus) {
 /* ---------------------------------------
    ADMIN - PRODUCTS
 --------------------------------------- */
-export async function updateProduct(productPayload) {
+export async function updateProduct(id, product) {
   try {
-    const payload = {
-      action: "updateProduct",
-      ...productPayload,
-    };
+    return await fetch(`${API_URL}/products/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(product),
+    }).then((r) => r.json());
 
-    return await postJSON( payload);
   } catch (error) {
-    console.error("updateProduct error:", error);
+    console.error(error);
+
     return {
       success: false,
       message: "Failed to update product",
@@ -280,10 +318,10 @@ export async function updateProduct(productPayload) {
 --------------------------------------- */
 export async function addProduct(product) {
   try {
-    return await postJSON( {
-      action: "addProduct",
-      ...product,
-    });
+    return await postJSON(
+      `${API_URL}/products`,
+      product
+    );
   } catch (error) {
     console.error(error);
 
@@ -297,12 +335,12 @@ export async function addProduct(product) {
 /* ---------------------------------------
    DELETE PRODUCT
 --------------------------------------- */
-export async function deleteProduct(productId) {
+export async function deleteProduct(id) {
   try {
-    return await postJSON( {
-      action: "deleteProduct",
-      productId,
-    });
+    return await fetch(`${API_URL}/products/${id}`, {
+      method: "DELETE",
+    }).then((r) => r.json());
+
   } catch (error) {
     console.error(error);
 
@@ -313,46 +351,23 @@ export async function deleteProduct(productId) {
   }
 }
 
-export async function updateDeliveryStatus(refId, status) {
-  const payload = {
-    action: "updateDeliveryStatus",
-    refId,
-    status,
-  };
 
-  const res = await fetch(SCRIPT_URL, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-  return await res.json();
-}
 
 /* ---------------------------------------
    ASSIGN DELIVERY BOY
 --------------------------------------- */
-
 export async function assignDeliveryBoy(
   orderId,
-  deliveryBoy,
-  mobile
+  deliveryBoyId
 ) {
-  try {
-    return await postJSON( {
-      action: "assignDeliveryBoy",
-      orderId,
-      deliveryBoy,
-      mobile,
-    });
-  } catch (error) {
-    console.error("assignDeliveryBoy:", error);
-
-    return {
-      success: false,
-      message: "Unable to assign delivery boy.",
-    };
-  }
+  return await putJSON(
+    `${API_URL}/orders/${orderId}/assign`,
+    {
+      delivery_boy_id: deliveryBoyId,
+    }
+  );
 }
+
 /* ---------------------------------------
    TODAY DELIVERIES
 --------------------------------------- */
@@ -380,12 +395,10 @@ export async function fetchTodayDeliveries(deliveryBoy) {
 --------------------------------------- */
 export async function fetchDeliveryBoys() {
   try {
-    const data = await getJSON(`${SCRIPT_URL}?action=deliveryBoys`);
+    const data = await getJSON(`${API_URL}/delivery-boys`);
 
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data?.deliveryBoys)) return data.deliveryBoys;
+    return data.deliveryBoys || [];
 
-    return [];
   } catch (error) {
     console.error("fetchDeliveryBoys:", error);
     return [];
@@ -410,10 +423,10 @@ export async function fetchNotifications(phone) {
   );
 }
 export async function createNotification(notification) {
-  return await postJSON({
-    action: "createNotification",
-    ...notification,
-  });
+  return await postJSON(
+    `${API_URL}/notifications`,
+    notification
+  );
 }
 export async function markNotificationRead(id) {
   return await postJSON({
@@ -460,3 +473,386 @@ export async function deleteMultipleNotifications(ids) {
     ids,
   });
 }
+export async function uploadProductImage(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await fetch(`${API_URL}/products/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    throw new Error("Image upload failed");
+  }
+
+  return await res.json();
+}
+// ===============================
+// Get Customer Cart
+// ===============================
+export async function fetchCart(customerId) {
+  return await getJSON(`${API_URL}/cart/${customerId}`);
+}
+
+// ===============================
+// Place Order
+// ===============================
+export async function placeOrder(orderData) {
+  return await postJSON(
+    `${API_URL}/orders`,
+    orderData
+  );
+}
+
+
+/* ==========================================================
+   SUBSCRIPTIONS
+========================================================== */
+
+export async function fetchCustomerSubscription(customerId) {
+  const data = await getJSON(
+    `${API_URL}/subscriptions/customer/${customerId}`
+  );
+  return data.subscription;
+}
+
+export async function createSubscription(payload) {
+  return await postJSON(
+    `${API_URL}/subscriptions`,
+    payload
+  );
+}
+
+export async function updateSubscription(id, payload) {
+  const data = await putJSON(
+    `${API_URL}/subscriptions/${id}`,
+    payload
+  );
+  return data.subscription;
+}
+
+export async function updateSubscriptionStatus(id, status) {
+  return await putJSON(
+    `${API_URL}/subscriptions/${id}/status`,
+    { status }
+  );
+}
+
+export async function renewSubscription(id, payload) {
+  const data = await putJSON(
+    `${API_URL}/subscriptions/${id}/renew`,
+    payload
+  );
+  return data.subscription;
+}
+
+export async function deleteSubscription(id) {
+  return await deleteJSON(
+    `${API_URL}/subscriptions/${id}`
+  );
+}
+
+export async function fetchSubscriptionHistory(customerId) {
+  const data = await getJSON(
+    `${API_URL}/subscriptions/history/${customerId}`
+  );
+  return data.history;
+}
+
+export async function fetchBillingSummary(customerId) {
+  const data = await getJSON(
+    `${API_URL}/subscriptions/billing/${customerId}`
+  );
+  return data.billing;
+}
+
+export async function fetchUpcomingDelivery(customerId) {
+  const data = await getJSON(
+    `${API_URL}/subscriptions/upcoming/${customerId}`
+  );
+  return data.delivery;
+}
+/* ---------------------------------------
+   ADD TO CART
+--------------------------------------- */
+
+export async function addCartItem(cartItem) {
+  return await postJSON(`${API_URL}/cart`, cartItem);
+}
+export async function deleteCartItem(id) {
+  return await deleteJSON(`${API_URL}/cart/${id}`);
+}
+export async function updateCartItem(id, quantity) {
+  return await putJSON(`${API_URL}/cart/${id}`, {
+    quantity,
+  });
+}
+
+export async function getDashboard(customerId) {
+  return await getJSON(
+    `${API_URL}/dashboard/${customerId}`
+  );
+}
+export async function fetchCustomerSubscriptions(customerId) {
+  return await getJSON(
+    `${API_URL}/subscriptions/customer/${customerId}`
+  );
+}
+export async function fetchSubscription(id) {
+  return await getJSON(`${API_URL}/subscriptions/${id}`);
+}
+export async function fetchCustomerAddresses(customerId) {
+  return await getJSON(
+    `${API_URL}/addresses/customer/${customerId}`
+  );
+}
+export async function createAddress(data) {
+  return await postJSON(`${API_URL}/addresses`, data);
+}
+
+export async function updateAddress(id, data) {
+  return await putJSON(`${API_URL}/addresses/${id}`, data);
+}
+
+export async function deleteAddress(id) {
+  return await deleteJSON(`${API_URL}/addresses/${id}`);
+}
+
+export async function setDefaultAddress(id, customer_id) {
+  return await putJSON(
+    `${API_URL}/addresses/${id}/default`,
+    { customer_id }
+  );
+}
+export async function getCustomerOrders(customerId) {
+  return await getJSON(`${API_URL}/orders/customer/${customerId}`);
+}
+export async function createCustomer(payload) {
+  return await postJSON(
+    `${API_URL}/customers`,
+    payload
+  );
+}
+export async function fetchProductSizes(productId) {
+  return await getJSON(
+    `${API_URL}/products/${productId}/sizes`
+  );
+}
+
+export async function addProductSize(productId, size) {
+  return await postJSON(
+    `${API_URL}/products/${productId}/sizes`,
+    size
+  );
+}
+
+export async function updateProductSize(id, size) {
+  return await putJSON(
+    `${API_URL}/products/size/${id}`,
+    size
+  );
+}
+
+export async function deleteProductSize(id) {
+  return await deleteJSON(
+    `${API_URL}/products/size/${id}`
+  );
+}
+export async function deliveryLogin(phone, password) {
+  return await postJSON(
+    `${API_URL}/delivery-boys/login`,
+    {
+      phone,
+      password,
+    }
+  );
+}
+export async function fetchDeliveryOrders(deliveryBoyId) {
+  return await getJSON(
+    `${API_URL}/delivery-boys/${deliveryBoyId}/orders`
+  );
+}
+/* ==========================================================
+   PAYMENTS
+========================================================== */
+
+export async function createPaymentOrder(amount) {
+  return await postJSON(
+    `${API_URL}/payments/create-order`,
+    {
+      amount,
+    }
+  );
+}
+
+export async function verifyPayment(paymentData) {
+  return await postJSON(
+    `${API_URL}/payments/verify`,
+    paymentData
+  );
+}
+export async function getMonthlyDeliveryReport(month, year) {
+  const res = await fetch(
+    `${API_URL}/reports/monthly-delivery?month=${month}&year=${year}`
+  );
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message);
+  }
+
+  return data;
+}
+export async function loginCustomer(loginId, password) {
+  const response = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      loginId,
+      password,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message);
+  }
+
+  return data;
+}
+export async function registerCustomer(customer) {
+  const response = await fetch(`${API_URL}/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(customer),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message);
+  }
+
+  return data;
+}
+const handleCustomerLogin = async () => {
+  try {
+    setLoading(true);
+
+    const res = await loginCustomer(loginId, password);
+
+    console.log("Login Response:", res);
+
+    setCustomerLogin(res.user);
+
+    localStorage.setItem(
+      "supabase_session",
+      JSON.stringify(res.session)
+    );
+
+    redirectUser("/dashboard");
+
+  } catch (err) {
+    console.error(err);
+    alert(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+export function setCustomerLogin(customer) {
+  localStorage.setItem(
+    "customer",
+    JSON.stringify(customer)
+  );
+}
+export async function forgotPassword(email) {
+
+  const response =
+    await fetch(
+      `${API_URL}/auth/forgot-password`,
+      {
+        method:"POST",
+
+        headers:{
+          "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify({
+          email
+        })
+
+      }
+    );
+
+  const data =
+    await response.json();
+
+  if(!response.ok){
+
+    throw new Error(data.message);
+
+  }
+
+  return data;
+
+}
+export async function resetPassword(payload){
+
+  const response=
+    await fetch(
+      `${API_URL}/auth/reset-password`,
+      {
+        method:"POST",
+
+        headers:{
+          "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify(payload)
+
+      }
+    );
+
+  const data=
+    await response.json();
+
+  if(!response.ok){
+
+    throw new Error(data.message);
+
+  }
+
+  return data;
+
+}
+
+// ==========================================
+// Subscription Delivery Summary
+// ==========================================
+export async function fetchSubscriptionDeliverySummary(subscriptionId) {
+  return await getJSON(
+    `${API_URL}/subscriptions/${subscriptionId}/delivery-summary`
+  );
+}
+export async function pauseSubscriptionApi(id, data) {
+  return await postJSON(
+    `${API_URL}/subscriptions/${id}/pause`,
+    data
+  );
+}
+
+export async function resumeSubscriptionApi(id) {
+  return await postJSON(
+    `${API_URL}/subscriptions/${id}/resume`,
+    {}
+  );
+}
+
+

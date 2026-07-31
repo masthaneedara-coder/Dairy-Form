@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-import { fetchProducts } from "../config/api";
+import { getProducts } from "../services/productService";
 import { addToCart, getCartItemCount } from "../config/cart";
 import { useSearchParams } from "react-router-dom";
+
+import { addProductToCart } from "../services/cartService";
+import { useAuthSession } from "../context/AuthSessionContext";
 import Categories from "../Components/home/Categories";
-import { PRODUCT_SIZES } from "../config/productSizes";
+
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1563636619-e9143da7973b?q=80&w=1200&auto=format&fit=crop";
@@ -16,14 +18,21 @@ export default function Products() {
 const selectedCategory =
   searchParams.get("category") || "All";
   const navigate = useNavigate();
+  const { customer } = useAuthSession();
   const audioRef = useRef(null);
 
   const [products, setProducts] = useState([]);
   const [cartCount, setCartCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [quantities, setQuantities] = useState({});
   const [selectedSizes, setSelectedSizes] = useState({});
   const [toast, setToast] = useState("");
   const [addedProduct, setAddedProduct] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  useEffect(() => {
+  setCartCount(getCartItemCount());
+}, []);
 
   /* ----------------------------------
      PLAY CART SOUND
@@ -51,105 +60,109 @@ const selectedCategory =
      NORMALIZE PRODUCT DATA
      Supports many Google Sheet column names
   ---------------------------------- */
-  const normalizeProduct = (item, index = 0) => {
-    const rawName =
-      item.name ||
-      item.Name ||
-      item.productName ||
-      item["Product Name"] ||
-      item["Product"] ||
-      item["Item Name"] ||
-      item["Title"] ||
-      "";
+const normalizeProduct = (item, index = 0) => {
+  const rawName =
+    item.name ||
+    item.Name ||
+    item.productName ||
+    item["Product Name"] ||
+    item["Product"] ||
+    item["Item Name"] ||
+    item["Title"] ||
+    "";
 
-    const rawPrice =
-      item.price ??
-      item.Price ??
-      item.productPrice ??
-      item["Product Price"] ??
-      item["Price/Liter"] ??
-      item["Price Per Liter"] ??
-      item["Rate"] ??
-      item["Amount"] ??
-      0;
+  const rawPrice =
+    item.price ??
+    item.Price ??
+    item.productPrice ??
+    item["Product Price"] ??
+    item["Price/Liter"] ??
+    item["Price Per Liter"] ??
+    item["Rate"] ??
+    item["Amount"] ??
+    0;
 
-    const rawStock =
-      item.stock ??
-      item.Stock ??
-      item.qty ??
-      item.quantity ??
-      item["Stock Qty"] ??
-      item["Stock Quantity"] ??
-      item["Available Stock"] ??
-      item["Available Qty"] ??
-      0;
+  const rawStock =
+    item.stock ??
+    item.Stock ??
+    item.qty ??
+    item.quantity ??
+    item["Stock Qty"] ??
+    item["Stock Quantity"] ??
+    item["Available Stock"] ??
+    item["Available Qty"] ??
+    0;
 
-    const rawImage =
-      item.image ||
-      item.Image ||
-      item.productImage ||
-      item["Product Image"] ||
-      item["Image URL"] ||
-      item["Photo"] ||
-      "";
+  const rawImage =
+    item.image ||
+    item.Image ||
+    item.productImage ||
+    item["Product Image"] ||
+    item["Image URL"] ||
+    item["Photo"] ||
+    "";
 
-    return {
-      id:
-        item.id ||
-        item.productId ||
-        item["Product ID"] ||
-        item["ID"] ||
-        `product-${index}`,
-      name: String(rawName || "Product"),
-      price: toNumber(rawPrice, 0),
-      stock: toNumber(rawStock, 0),
-      image: String(rawImage || "").trim(),
-      category:
-        item.category ||
-        item.Category ||
-        item["Product Category"] ||
-        "",
-    };
+  return {
+    id:
+      item.id ||
+      item.productId ||
+      item["Product ID"] ||
+      item["ID"] ||
+      `product-${index}`,
+
+    name: String(rawName || "Product"),
+
+    price: toNumber(rawPrice, 0),
+
+    stock: toNumber(rawStock, 0),
+
+    image: String(rawImage || "").trim(),
+
+    category:
+  item.category ||
+  item.categories?.name ||
+  item.Category ||
+  item["Product Category"] ||
+  item.product_category ||
+  item.productType ||
+  item.type ||
+  "",
+
+  product_sizes: item.product_sizes || [],
   };
-  const filteredProducts =
-  selectedCategory === "All"
-    ? products
-    : products.filter((product) => {
-        const name = (product.name || "").toLowerCase();
+};
+    
+    
 
-        switch (selectedCategory) {
-          case "Buffalo Milk":
-            return name.includes("buffalo");
+  const categories = useMemo(() => {
+  const uniqueCategories = [
+    "All",
+    ...new Set(
+      products
+        .map((product) => product.category)
+        .filter(Boolean)
+    ),
+  ];
 
-          case "Cow Milk":
-            return name.includes("cow");
+  return uniqueCategories;
+}, [products]);
 
-          case "Curd":
-            return name.includes("curd");
 
-          case "Ghee":
-            return name.includes("ghee") || name.includes("gee");
+ 
+ const filteredProducts = products.filter((product) => {
+  const keyword = searchTerm.trim().toLowerCase();
 
-          case "Paneer":
-            return name.includes("paneer");
+  const matchesCategory =
+    selectedCategory === "All" ||
+    product.category?.trim() === selectedCategory;
 
-          case "Eggs":
-            return name.includes("egg");
+  const matchesSearch =
+    keyword === "" ||
+    product.name?.toLowerCase().includes(keyword) ||
+    product.category?.toLowerCase().includes(keyword);
 
-          case "Vegetables":
-            return name.includes("vegetable");
-
-          case "Groceries":
-            return (
-              name.includes("rice") ||
-              name.includes("oil") ||
-              name.includes("cashew")
-            );
-
-          default:
-            return true;
-        }
-      });
+  return matchesCategory && matchesSearch;
+});
 
   /* ----------------------------------
      SIZE PRICE CALCULATION
@@ -178,43 +191,32 @@ const selectedCategory =
   /* ----------------------------------
      LOAD PRODUCTS
   ---------------------------------- */
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const data = await fetchProducts();
+ useEffect(() => {
+  loadProducts();
+}, []);
 
-        console.log("Products API response:", data);
+const loadProducts = async () => {
+  try {
+    setLoading(true);
+    setError("");
 
-        const list = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.products)
-          ? data.products
-          : Array.isArray(data?.data)
-          ? data.data
-          : [];
+    const products = await getProducts();
 
-        const normalized = list
-          .map((item, index) => normalizeProduct(item, index))
-          .filter((p) => p.name && p.name.trim() !== "");
+    console.log("API Response:", products);
 
-        console.log("Normalized products:", normalized);
+    const list = products.map((item, index) =>
+      normalizeProduct(item, index)
+    );
 
-        setProducts(normalized);
-      } catch (error) {
-        console.error("Products fetch failed:", error);
-        setProducts([]);
-      }
-    };
+    setProducts(list);
+  } catch (err) {
+    console.error(err);
 
-    loadProducts();
-    setCartCount(getCartItemCount());
-
-    // sync cart count if localStorage changes in another tab/page
-    const onStorage = () => setCartCount(getCartItemCount());
-    window.addEventListener("storage", onStorage);
-
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+    setError("Failed to load products.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   /* ----------------------------------
      QUANTITY HANDLERS
@@ -245,67 +247,81 @@ const selectedCategory =
   /* ----------------------------------
      ADD TO CART
   ---------------------------------- */
-  const getCalculatedPrice = (product) => {
+ const getCalculatedPrice = (product) => {
 
+  const sizes = product.product_sizes || [];
+
+  // If no sizes exist, use the product price
+  if (sizes.length === 0) {
+    return Number(product.price || 0);
+  }
+
+  // Selected size label
   const selectedLabel =
-    selectedSizes[product.id] || "1 L";
+    selectedSizes[product.id] ||
+    sizes[0].label;
 
-  const selectedSize =
-    (PRODUCT_SIZES[product.name] || []).find(
-      (item) => item.label === selectedLabel
-    );
+  // Find selected size object
+  const selectedSize = sizes.find(
+    (size) => size.label === selectedLabel
+  );
+  if (selectedSize && !selectedSize.available) {
 
-  const multiplier =
-    selectedSize?.multiplier || 1;
+  setToast("Selected size is out of stock.");
 
-  return Math.round(product.price * multiplier);
+  return;
 
+}
+
+  return Number(
+    selectedSize?.price || product.price || 0
+  );
 };
-const handleAddToCart = (product) => {
-  console.log("Clicked:", product);
-
+const handleAddToCart = async (product) => {
   const qty = quantities[product.id] || 1;
-  const size = selectedSizes[product.id] || "1 L";  
-const price = getCalculatedPrice(product);
-  
+  const size = selectedSizes[product.id] || "1 L";
+  const price = getCalculatedPrice(product);
 
-  if (!product.name || price <= 0) {
-    console.log("Validation Failed");
-    setToast("Product data is invalid");
+  if (!customer) {
+    navigate("/auth");
     return;
   }
 
-  console.log("Adding to cart...");
+  try {
+    await addProductToCart({
+      customer_id: customer.id,
+      product_id: product.id,
+      quantity: qty,
+      price,
+      size,
+    });
 
-  addToCart({
-    id: product.id,
-    name: product.name,
-    image: product.image || FALLBACK_IMAGE,
-    size,
-    qty,
-    price,
-    stock: product.stock,
-    total: qty * price,
-  });
+    // Keep local cart temporarily so existing Cart page still works
+    addToCart({
+      id: product.id,
+      name: product.name,
+      image: product.image || FALLBACK_IMAGE,
+      size,
+      qty,
+      price,
+      stock: product.stock,
+      total: qty * price,
+    });
 
-  console.log("Cart Added");
+    setCartCount(getCartItemCount());
+    setAddedProduct(product.id);
+    playCartSound();
+    setToast(`${product.name} added to cart`);
 
-  setCartCount(getCartItemCount());
+    setTimeout(() => {
+      setToast("");
+      setAddedProduct(null);
+    }, 2000);
 
-  console.log("Changing Button");
-
-  setAddedProduct(product.id);
-
-  console.log("Playing Sound");
-
-  playCartSound();
-
-  setToast(`${product.name} added to cart`);
-
-  setTimeout(() => {
-    setToast("");
-    setAddedProduct(null);
-  }, 2000);
+  } catch (err) {
+    console.error(err);
+    setToast("Failed to add item");
+  }
 };
 
   return (
@@ -360,31 +376,62 @@ const price = getCalculatedPrice(product);
 
         {/* PRODUCTS GRID */}
         <Categories
+          categories={categories}
           selectedCategory={selectedCategory}
           setSelectedCategory={(category) =>
             navigate(`/products?category=${encodeURIComponent(category)}`)
           }
         />
-
-        {/* EMPTY */}
-        {products.length === 0 && (
+        <div className="max-w-xl mx-auto mt-6">
+        <input
+          type="text"
+          placeholder="🔍 Search products..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full rounded-2xl border border-green-200 px-5 py-3 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
+        />
+      </div>
+        {loading && (
           <div className="bg-white rounded-3xl shadow-lg p-10 text-center mt-8">
-            <div className="text-6xl mb-4">🥛</div>
-            <h2 className="text-2xl font-black text-gray-700">
-              No products found
-            </h2>
+
+            <div className="animate-spin rounded-full h-14 w-14 border-4 border-green-200 border-t-green-600 mx-auto"></div>
+
+            <p className="mt-5 text-lg font-semibold text-gray-600">
+              Loading products...
+            </p>
+
           </div>
         )}
-        {/* PRODUCTS */}
-            {filteredProducts.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-lg p-10 text-center mt-8">
-                <div className="text-6xl mb-4">🥛</div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-8 text-center mt-8">
 
-                <h2 className="text-2xl font-black text-gray-700">
-                  No products found
-                </h2>
-              </div>
-            ) : (
+            <h2 className="text-2xl font-bold text-red-700">
+              {error}
+            </h2>
+
+            <button
+              onClick={loadProducts}
+              className="mt-5 bg-red-600 text-white px-6 py-3 rounded-xl font-bold"
+            >
+              Retry
+            </button>
+
+          </div>
+        )}
+
+        {/* EMPTY */}
+        {!loading && !error && filteredProducts.length === 0 ? (
+                <div className="bg-white rounded-3xl shadow-lg p-10 text-center mt-8">
+                  <div className="text-6xl mb-4">🥛</div>
+
+                  <h2 className="text-2xl font-black text-gray-700">
+                    {searchTerm
+                      ? `No products found for "${searchTerm}"`
+                      : "No products found"}
+                  </h2>
+                </div>
+              ) : (
+           
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 mt-6">
 
                 {filteredProducts.map((product) => {
@@ -397,7 +444,10 @@ const price = getCalculatedPrice(product);
                       className="bg-white rounded-3xl shadow-lg border border-green-100 overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-2"
                     >
                       <img
-                        src={product.image || FALLBACK_IMAGE}
+                        src={product.image?.trim() || FALLBACK_IMAGE}
+                        onError={(e) => {
+                          e.target.src = FALLBACK_IMAGE;
+                        }}
                         alt={product.name}
                         className="w-full h-36 object-cover"
                       />
@@ -420,85 +470,125 @@ const price = getCalculatedPrice(product);
 
                             <div className="flex flex-wrap gap-2">
 
-                              {(PRODUCT_SIZES[product.name] || []).map((size) => (
+                             {(product.product_sizes || []).map((size) => {
 
+                              const isSelected =
+                                (selectedSizes[product.id] ||
+                                  product.product_sizes?.[0]?.label) === size.label;
+
+                              return (
                                 <button
-                                  key={size.label}
+                                  key={size.id}
                                   type="button"
-                                  onClick={() =>
-                                    setSelectedSizes({
-                                      ...selectedSizes,
-                                      [product.id]: size.label,
-                                    })
-                                  }
-                                  className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-300 border
 
-                                  ${
-                                    (selectedSizes[product.id] || "1 L") === size.label
-                                      ? "bg-green-600 text-white border-green-600 shadow"
-                                      : "bg-white text-gray-700 border-gray-300 hover:border-green-500 hover:text-green-600"
-                                  }
+                                  disabled={!size.available}
+
+                                  onClick={() => {
+
+                                    if (!size.available) return;
+
+                                    setSelectedSizes(prev => ({
+                                      ...prev,
+                                      [product.id]: size.label,
+                                    }));
+
+                                  }}
+
+                                  className={`
+
+                                    px-3
+                                    py-1.5
+                                    rounded-full
+                                    text-sm
+                                    font-semibold
+                                    border
+                                    transition-all
+                                    duration-300
+
+                                    ${
+                                      !size.available
+                                        ? "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed"
+                                        : isSelected
+                                        ? "bg-green-600 text-white border-green-600 shadow"
+                                        : "bg-white text-gray-700 border-gray-300 hover:border-green-500 hover:text-green-600"
+                                    }
 
                                   `}
                                 >
                                   {size.label}
-                                </button>
 
-                              ))}
+                                  {!size.available && (
+                                    <div className="text-[10px]">
+                                      Out
+                                    </div>
+                                  )}
+
+                                </button>
+                              );
+
+                            })}
 
                             </div>
 
                           </div>
 
-                        <p
-                          className={`mt-2 font-semibold ${
-                            Number(product.stock) === 0
-                              ? "text-red-600"
-                              : Number(product.stock) <= 2
-                              ? "text-red-500"
-                              : Number(product.stock) <= 5
-                              ? "text-orange-500"
-                              : "text-green-600"
-                          }`}
-                        >
-                          {Number(product.stock) === 0
-                            ? "Out of Stock"
-                            : Number(product.stock) <= 2
-                            ? `⚠ Only ${product.stock} Left`
-                            : Number(product.stock) <= 5
-                            ? `🔥 Low Stock (${product.stock})`
-                            : `✔ ${product.stock} Available`}
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                          <button
-                              disabled={Number(product.stock) === 0}
-                              onClick={() => handleAddToCart(product)}
-                              className={`rounded-2xl py-3 font-bold transition-all duration-300 ${
-                                Number(product.stock) === 0
-                                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                  : addedProduct === product.id
-                                  ? "bg-green-700 text-white scale-105 shadow-lg"
-                                  : "bg-green-600 hover:bg-green-700 text-white"
-                              }`}
-                            >
-                              {Number(product.stock) === 0
-                                ? "Out of Stock"
-                                : addedProduct === product.id
-                                ? "✓ Added"
-                                : "Add To Cart"}
-                            </button>
-                          <button
-                            disabled={Number(product.stock) === 0}
-                            onClick={() => navigate("/subscription")}
-                            className={`rounded-2xl py-3 font-bold ${
-                              Number(product.stock) === 0
-                                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                                : "bg-green-50 hover:bg-green-100 text-green-700"
+                       <p
+                            className={`mt-2 font-semibold ${
+                              product.stock <= 0
+                                ? "text-red-600"
+                                : product.stock <= 5
+                                ? "text-yellow-600"
+                                : "text-green-600"
                             }`}
                           >
-                            Subscribe
+                            {product.stock <= 0
+                              ? "🔴 Out of Stock"
+                              : product.stock <= 5
+                              ? `🟡 Only ${product.stock} Left`
+                              : `🟢 In Stock (${product.stock})`}
+                              
+                          </p>
+
+                       <div
+                          className={
+                            product.is_subscription
+                              ? "grid grid-cols-2 gap-2 mt-3"
+                              : "mt-3"
+                          }
+                        >
+                          <button
+                            disabled={Number(product.stock) === 0}
+                            onClick={() => handleAddToCart(product)}
+                            className={`rounded-2xl py-3 font-bold transition-all duration-300 ${
+                              Number(product.stock) === 0
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                : addedProduct === product.id
+                                ? "bg-green-700 text-white scale-105 shadow-lg"
+                                : "bg-green-600 hover:bg-green-700 text-white"
+                            } ${
+                              product.is_subscription ? "" : "w-full"
+                            }`}
+                          >
+                            {Number(product.stock) === 0
+                              ? "Out of Stock"
+                              : addedProduct === product.id
+                              ? "✓ Added"
+                              : "Add To Cart"}
                           </button>
+
+                          {product.is_subscription && (
+                            <button
+                              disabled={Number(product.stock) === 0}
+                              onClick={() => navigate("/subscription")}
+                              className={`rounded-2xl py-3 font-bold ${
+                                Number(product.stock) === 0
+                                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                  : "bg-green-50 hover:bg-green-100 text-green-700"
+                              }`}
+                            >
+                              Subscribe
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -512,3 +602,6 @@ const price = getCalculatedPrice(product);
                 </div>
               );
             }
+            
+            
+          

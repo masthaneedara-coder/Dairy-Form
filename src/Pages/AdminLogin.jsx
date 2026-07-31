@@ -10,36 +10,27 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
 
   const handleAdminLogin = async () => {
-  if (!mobile.trim() || !password.trim()) {
-    alert("Please enter mobile number and password");
+  if (!loginId || !password) {
+    alert("Please enter Email and Password");
     return;
   }
 
   try {
-    setLoading(true);
+    const admin = await adminLogin(loginId, password);
 
-    // Demo Admin Credentials
-    const ADMIN_MOBILE = "9989663837";
-    const ADMIN_PASSWORD = "admin";
+    setAdminLogin({
+      id: admin.id,
+      name: admin.full_name,
+      email: admin.email,
+      phone: admin.phone,
+      role: admin.role,
+    });
 
-    if (
-      mobile.trim() === ADMIN_MOBILE &&
-      password === ADMIN_PASSWORD
-    ) {
-      setAdminLogin({
-        name: "Farm Fresh Admin",
-      });
+    navigate("/admin");
 
-      navigate("/admin", { replace: true });
-      return;
-    }
-
-    alert("Invalid mobile number or password");
   } catch (error) {
     console.error(error);
-    alert("Login failed");
-  } finally {
-    setLoading(false);
+    alert(error.message || "Invalid admin credentials");
   }
 };
 

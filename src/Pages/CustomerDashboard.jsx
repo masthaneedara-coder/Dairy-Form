@@ -1,18 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
-  fetchOrdersByPhone,
-  fetchSubscriptionsByPhone,
-  updateSubscriptionStatus,
+  getDashboard,
+   pauseSubscriptionApi,
+    resumeSubscriptionApi,
+  getCustomerOrders,
 } from "../config/api";
-import {
-  getCustomerName,
-  getCustomerPhone,
-  logoutCustomer,
-} from "../config/auth";
+import { fetchCustomerSubscriptions } from "../config/api";
+import PauseSubscriptionModal from "../components/subscription/PauseSubscriptionModal";
+
+
+import { useAuthSession } from "../context/AuthSessionContext";
 
 export default function CustomerDashboard() {
   const navigate = useNavigate();
+  
+ const { customer, logout } = useAuthSession();
+ const [dashboard, setDashboard] = useState(null);
+ const [loading, setLoading] = useState(true);
+ const [subscriptionHistory, setSubscriptionHistory] = useState([]);
+ const [showPauseModal, setShowPauseModal] = useState(false);
+
+const [selectedSubscription, setSelectedSubscription] = useState(null);
+ const summary = dashboard?.summary || {
+  totalOrders: 0,
+  totalSpent: 0,
+  totalSubscriptions: 0,
+  activeSubscriptions: 0,
+};
+const latestOrders = dashboard?.recentOrders || [];
   const subscriptionScrollRef = useRef(null);
 
     const scrollSubscriptions = (direction = "right") => {
@@ -27,89 +44,53 @@ export default function CustomerDashboard() {
       });
     };
 
-  const [orders, setOrders] = useState([]);
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [statusUpdatingId, setStatusUpdatingId] = useState("");
-
-  const customerName = getCustomerName() || "Customer";
-  const customerPhone = getCustomerPhone() || "";
-
   useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
-
-        const phone =
-          getCustomerPhone() || localStorage.getItem("customerPhone") || "";
-
-        if (!phone) {
-          setOrders([]);
-          setSubscriptions([]);
-          return;
-        }
-
-        const [ordersData, subscriptionsData] = await Promise.all([
-          fetchOrdersByPhone(phone),
-          fetchSubscriptionsByPhone(phone),
-        ]);
-
-        setOrders(Array.isArray(ordersData) ? ordersData : []);
-        setSubscriptions(Array.isArray(subscriptionsData) ? subscriptionsData : []);
-      } catch (error) {
-        console.error("Dashboard load failed:", error);
-        setOrders([]);
-        setSubscriptions([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  if (customer) {
     loadDashboard();
-  }, [customerPhone]);
+  }
+}, [customer]);
+   
+    
 
-  const totalOrders = useMemo(() => orders.length, [orders]);
+const [orders, setOrders] = useState([]);
+const [subscriptions, setSubscriptions] = useState([]);
+  
+  const [statusUpdatingId, setStatusUpdatingId] = useState("");
+  const loadDashboard = async () => {
+  try {
+    setLoading(true);
 
-  const totalSpent = useMemo(
-    () =>
-      orders.reduce(
-        (sum, order) => sum + Number(order.totalAmount || order.total || 0),
-        0
-      ),
-    [orders]
-  );
+    if (!customer) return;
 
-  const activeSubscriptions = useMemo(
-    () =>
-      subscriptions.filter(
-        (sub) => String(sub.status || "").toLowerCase() === "active"
-      ),
-    [subscriptions]
-  );
+    const res = await getDashboard(customer.id);
+    console.log("Dashboard Response:", res);
+    console.log("Subscriptions:", res.dashboard.subscriptions);
+    const historyRes = await fetchCustomerSubscriptions(customer.id);
+    setSubscriptionHistory(historyRes.subscriptions || []);
+  
 
-  const pausedSubscriptions = useMemo(
-    () =>
-      subscriptions.filter(
-        (sub) => String(sub.status || "").toLowerCase() === "paused"
-      ),
-    [subscriptions]
-  );
+    console.log("Dashboard API:", res);
 
-  const subscriptionCount = useMemo(() => subscriptions.length, [subscriptions]);
-  const activeSubscriptionCount = useMemo(
-    () => activeSubscriptions.length,
-    [activeSubscriptions]
-  );
+    if (!res.success) {
+      throw new Error(res.message);
+    }
 
-  const dashboardStatus =
-    activeSubscriptionCount > 0 ? "Active" : subscriptionCount > 0 ? "Paused" : "No Subscription";
+    setDashboard(res.dashboard);
+    setOrders(res.dashboard.recentOrders || []);
+    setSubscriptions(res.dashboard.subscriptions || []);
 
-  const latestOrders = useMemo(() => orders.slice(0, 5), [orders]);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleLogout = () => {
-    logoutCustomer();
-    navigate("/");
-  };
+
+ const handleLogout = async () => {
+  await logout();
+  navigate("/auth");
+};
 
   const formatMoney = (value) => {
     const num = Number(value || 0);
@@ -130,29 +111,59 @@ export default function CustomerDashboard() {
     });
   };
 
-  const handleSubscriptionStatusChange = async (subscriptionId, status) => {
-    try {
-      setStatusUpdatingId(subscriptionId);
+ const handleResume = async (subscriptionId) => {
+  try {
+    setStatusUpdatingId(subscriptionId);
 
-      const res = await updateSubscriptionStatus(subscriptionId, status);
+    await resumeSubscriptionApi(subscriptionId);
 
-      if (res?.success) {
-        setSubscriptions((prev) =>
-          prev.map((sub) =>
-            sub.subscriptionId === subscriptionId ? { ...sub, status } : sub
-          )
-        );
-        alert(`Subscription ${status.toLowerCase()} successfully`);
-      } else {
-        alert(res?.message || "Failed to update subscription");
-      }
-    } catch (error) {
-      console.error("Subscription status update failed:", error);
-      alert("Failed to update subscription");
-    } finally {
-      setStatusUpdatingId("");
+    await loadDashboard();
+
+    alert("Subscription resumed successfully.");
+
+  } catch (err) {
+    console.error(err);
+    alert("Unable to resume subscription.");
+  } finally {
+    setStatusUpdatingId("");
+  }
+};
+const handlePauseConfirm = async (
+  pauseFrom,
+  pauseTo
+) => {
+  try {
+
+    setLoading(true);
+
+    await pauseSubscriptionApi(
+    selectedSubscription.id,
+    {
+        pause_from: pauseFrom,
+        pause_to: pauseTo,
     }
-  };
+);
+
+    setShowPauseModal(false);
+
+    setSelectedSubscription(null);
+
+    await loadDashboard();
+
+    alert("Subscription paused successfully.");
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert("Unable to pause subscription.");
+
+  } finally {
+
+    setLoading(false);
+
+  }
+};
 
   if (loading) {
     return (
@@ -182,10 +193,10 @@ export default function CustomerDashboard() {
             <div>
               <p className="text-white/80 text-sm sm:text-base">Welcome back</p>
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mt-1">
-                👋 {customerName}
+                👋 {dashboard?.customer?.full_name || customer?.name}
               </h1>
               <p className="mt-2 text-white/90">
-                Phone: {customerPhone || "Not available"}
+                Phone: {dashboard?.customer?.phone || customer?.phone}
               </p>
             </div>
 
@@ -198,7 +209,7 @@ export default function CustomerDashboard() {
               </button>
 
               <button
-                onClick={() => navigate("/subscription")}
+                onClick={() => navigate("/subscription/create/:productId")}
                 className="px-5 py-3 rounded-2xl bg-white/15 border border-white/20 text-white font-bold"
               >
                 Subscription
@@ -216,11 +227,41 @@ export default function CustomerDashboard() {
 
         {/* STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
-          <StatCard title="Total Orders" value={totalOrders} color="green" />
-          <StatCard title="Total Spent" value={formatMoney(totalSpent)} color="blue" />
-          <StatCard title="Subscriptions" value={subscriptionCount} color="orange" />
-          <StatCard title="Active Subs" value={activeSubscriptionCount} color="emerald" />
-          <StatCard title="Status" value={dashboardStatus} color="pink" />
+         <StatCard
+              title="Total Orders"
+                value={summary.totalOrders}
+                color="green"
+              />
+
+              <StatCard
+                title="Total Spent"
+                value={formatMoney(summary.totalSpent)}
+                color="blue"
+              />
+
+              <StatCard
+                title="Subscriptions"
+                value={summary.totalSubscriptions}
+                color="orange"
+              />
+
+              <StatCard
+                title="Active Subs"
+                value={summary.activeSubscriptions}
+                color="emerald"
+              />
+
+              <StatCard
+                title="Status"
+                value={
+                  summary.activeSubscriptions > 0
+                    ? "Active"
+                    : summary.totalSubscriptions > 0
+                    ? "Paused"
+                    : "No Subscription"
+                }
+                color="pink"
+              />
         </div>
 
         {/* SUBSCRIPTIONS LIST */}
@@ -263,7 +304,7 @@ export default function CustomerDashboard() {
                   Start a milk subscription for hassle-free delivery.
                 </p>
                 <button
-                  onClick={() => navigate("/subscription")}
+                  onClick={() => navigate("/subscription/create/:productId")}
                   className="mt-5 px-6 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold"
                 >
                   Subscribe Now
@@ -282,21 +323,33 @@ export default function CustomerDashboard() {
                   "
                 >
                   {subscriptions.map((sub, index) => {
-                    const status = String(sub.status || "Active").toLowerCase();
-                    const isActive = status === "active";
-                    const isPaused = status === "paused";
-                    const isExpired = status === "expired";
-                    const isStopped = status === "stopped";
+                   const isPaused = sub.is_paused === true;
+
+                    const status = isPaused
+                      ? "paused"
+                      : (sub.status || "Active").toLowerCase();
+
+                    const isActive = !isPaused && status === "active";
+                  const isExpired = status === "expired";
+                  const isCancelled = status === "cancelled";
+                  const isStopped = status === "stopped";
+                  
 
                     return (
                       <div
-                        key={sub.subscriptionId || index}
-                        className="
-                          snap-start shrink-0
-                          w-[92%] sm:w-[430px] lg:w-[460px]
-                          rounded-[28px] border border-slate-200 bg-gradient-to-br from-white to-slate-50
-                          shadow-md hover:shadow-xl transition-all duration-300
-                          hover:-translate-y-1
+                        key={sub.id}
+                       className="
+                        relative
+                        overflow-hidden
+                        rounded-[32px]
+                        bg-white
+                        border border-green-100
+                        shadow-xl
+                        hover:shadow-2xl
+                        transition-all
+                        duration-300
+                        w-[430px]
+                        flex-shrink-0
                         "
                       >
                         {/* CARD HEADER */}
@@ -309,7 +362,7 @@ export default function CustomerDashboard() {
                               {sub.product || "Milk Subscription"}
                             </h3>
                             <p className="text-xs text-gray-500 mt-1 break-all">
-                              ID: {sub.subscriptionId || "-"}
+                              ID: {sub.id?.slice(0, 8)}
                             </p>
                           </div>
 
@@ -321,10 +374,12 @@ export default function CustomerDashboard() {
                                 ? "bg-yellow-100 text-yellow-700"
                                 : isExpired
                                 ? "bg-red-100 text-red-700"
+                                : isCancelled
+                                ? "bg-gray-200 text-gray-700"
                                 : "bg-slate-100 text-slate-700"
                             }`}
                           >
-                            {sub.status || "Active"}
+                            {isPaused ? "Paused" : (sub.status || "Active")}
                           </span>
                         </div>
 
@@ -332,7 +387,7 @@ export default function CustomerDashboard() {
                         <div className="p-5 grid grid-cols-2 gap-3">
                           <MiniInfoCard
                             label="Quantity"
-                            value={sub.qty || "N/A"}
+                              value={sub.quantity}
                             color="blue"
                           />
                           <MiniInfoCard
@@ -365,33 +420,28 @@ export default function CustomerDashboard() {
                             <div className="flex flex-wrap gap-3">
                               {isActive && (
                                 <button
-                                  onClick={() =>
-                                    handleSubscriptionStatusChange(
-                                      sub.subscriptionId,
-                                      "Paused"
-                                    )
-                                  }
-                                  disabled={statusUpdatingId === sub.subscriptionId}
+                                  onClick={() =>{
+                                   setSelectedSubscription(sub);
+                                    setShowPauseModal(true);
+                                  }}
+                                  disabled={statusUpdatingId === sub.id}
                                   className="flex-1 min-w-[120px] px-4 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow disabled:opacity-60"
                                 >
-                                  {statusUpdatingId === sub.subscriptionId
-                                    ? "Updating..."
-                                    : "Pause"}
+                                  {statusUpdatingId === sub.id
+                                  ? "Updating..."
+                                  : "Pause"}
                                 </button>
                               )}
 
                               {isPaused && (
                                 <button
-                                  onClick={() =>
-                                    handleSubscriptionStatusChange(
-                                      sub.subscriptionId,
-                                      "Active"
-                                    )
+                                  
+                                    onClick={() => handleResume(sub.id)
                                   }
-                                  disabled={statusUpdatingId === sub.subscriptionId}
+                                  disabled={statusUpdatingId === sub.id}
                                   className="flex-1 min-w-[120px] px-4 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold shadow disabled:opacity-60"
                                 >
-                                  {statusUpdatingId === sub.subscriptionId
+                                  {statusUpdatingId === sub.id
                                     ? "Updating..."
                                     : "Activate"}
                                 </button>
@@ -399,32 +449,31 @@ export default function CustomerDashboard() {
 
                               {isExpired && (
                                 <button
-                                  onClick={() => navigate("/subscription")}
-                                  className="flex-1 min-w-[120px] px-4 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow"
+                                  onClick={() =>
+                                    navigate(`/subscription/manage/${sub.id}`)
+                                  }
+                                  className="flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-white border border-green-200 text-green-700 font-bold hover:bg-green-50 transition-all duration-200"
                                 >
-                                  Renew
+                                  ⚙️ Manage
                                 </button>
                               )}
 
                               {isStopped && (
                                 <button
-                                  onClick={() =>
-                                    handleSubscriptionStatusChange(
-                                      sub.subscriptionId,
-                                      "Active"
-                                    )
-                                  }
-                                  disabled={statusUpdatingId === sub.subscriptionId}
+                                  
+                                    onClick={() => handleResume(sub.id)}
+                                  
+                                  disabled={statusUpdatingId === sub.id}
                                   className="flex-1 min-w-[120px] px-4 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold shadow disabled:opacity-60"
                                 >
-                                  {statusUpdatingId === sub.subscriptionId
+                                  {statusUpdatingId === sub.id
                                     ? "Updating..."
                                     : "Reactivate"}
                                 </button>
                               )}
 
                               <button
-                                onClick={() => navigate("/subscription")}
+                                onClick={() => navigate(`/subscription/manage/${sub.id}`)}
                                 className="flex-1 min-w-[160px] px-4 py-3 rounded-2xl bg-white border border-green-200 text-green-700 font-bold hover:bg-green-50"
                               >
                                 Manage
@@ -466,7 +515,7 @@ export default function CustomerDashboard() {
             title="Subscription"
             desc="Start or renew your milk subscription"
             color="blue"
-            onClick={() => navigate("/subscription")}
+            onClick={() => navigate("/subscription/create/:productId")}
           />
           <QuickCard
             icon="🛒"
@@ -505,38 +554,99 @@ export default function CustomerDashboard() {
             <div className="space-y-4">
               {latestOrders.map((order, index) => (
                 <div
-                  key={order.orderId || index}
+                  key={order.id}
                   className="rounded-2xl bg-slate-50 border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                 >
                   <div>
-                    <h3 className="font-bold text-green-700">
-                      Order #{order.orderId || index + 1}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {order.date || "-"}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Status:{" "}
-                      <span className="font-semibold text-blue-600">
-                        {order.status || "Pending"}
-                      </span>
-                    </p>
-                  </div>
+                   <h3 className="font-bold text-green-700">
+                    Order #{order.orderNumber}
+                  </h3>
 
-                  <div className="text-left sm:text-right">
-                    <p className="text-xl font-black text-green-700">
-                      {formatMoney(order.totalAmount || order.total || 0)}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {order.paymentMethod || "-"}
-                    </p>
-                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {order.orderDate
+                      ? new Date(order.orderDate).toLocaleDateString("en-IN")
+                      : "N/A"}
+                  </p>
+
+                  <p className="text-sm text-gray-600 mt-1">
+                    Products:{" "}
+                    {order.items?.map(item => item.products?.name).join(", ") || "-"}
+                  </p>
+                    
+                   
+                    <div className="mt-2 space-y-2">
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">
+                          Status:
+                        </span>
+
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            order.status === "Delivered"
+                              ? "bg-green-100 text-green-700"
+                              : order.status === "Pending"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : order.status === "Cancelled"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {order.status}
+                        </span>
+                      </div>
+                       </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">
+                          Payment:
+                        </span>
+
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            order.paymentStatus === "Paid"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-orange-100 text-orange-700"
+                          }`}
+                        >
+                          {/* {order.paymentStatus} */}
+                          {order.paymentMethod}
+                        </span>
+                      </div>
+
+                    </div>
+
+                    <div className="text-left sm:text-right">
+
+                      <p className="text-xl font-black text-green-700">
+                        Amount : ₹{order.totalAmount}
+                      </p>
+
+                      <p className="text-xl font-black text-green-700">
+                        Items : {order.totalItems}
+                      </p>
+
+                      <p className="text-xl font-black text-green-700">
+                        {order.paymentMethod}
+                      </p>
+
+                    </div>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+      <PauseSubscriptionModal
+          open={showPauseModal}
+          subscription={selectedSubscription}
+          loading={loading}
+          onClose={() => {
+              setShowPauseModal(false);
+              setSelectedSubscription(null);
+          }}
+          onConfirm={handlePauseConfirm}
+      />
     </div>
   );
 }

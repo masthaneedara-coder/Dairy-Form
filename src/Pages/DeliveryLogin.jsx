@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { deliveryLogin } from "../config/api";
 
 export default function DeliveryLogin() {
   const navigate = useNavigate();
@@ -16,18 +17,27 @@ export default function DeliveryLogin() {
 
     try {
       setLoading(true);
+     const res = await deliveryLogin(mobile, password);
 
-      // Temporary static delivery login
-      if (mobile === "8888888888" && password === "delivery123") {
-        localStorage.setItem("deliveryLogin", "true");
-        localStorage.setItem("deliveryBoyName", "Delivery Boy");
-        localStorage.setItem("deliveryBoyPhone", mobile);
-        localStorage.setItem("userRole", "delivery");
+        if (res.success) {
 
-        navigate("/delivery");
-      } else {
-        alert("Invalid delivery login credentials");
-      }
+            localStorage.setItem("deliveryLogin", "true");
+            localStorage.setItem("userRole", "delivery");
+
+            localStorage.setItem(
+                "deliveryBoy",
+                JSON.stringify(res.deliveryBoy)
+            );
+
+            navigate("/delivery");
+
+        } else {
+
+            alert(res.message);
+
+        }
+
+      
     } catch (error) {
       console.error(error);
       alert("Delivery login failed");

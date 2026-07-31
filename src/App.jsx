@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import Navbar from "./Components/Navbar";
 import { USER_ROLES } from "./config/appConfig";
 
@@ -15,8 +15,16 @@ import OrderHistory from "./Pages/OrderHistory";
 import TrackOrder from "./Pages/TrackOrder";
 
 /* Customer Protected Route */
-import ProtectedRoute from "./Components/ProtectedRoute";
+import CustomerRoute from "./components/CustomerRoute";
+import AdminRoute from "./components/AdminRoute";
+import DeliveryRoute from "./components/DeliveryRoute";
 import ForgotPassword from "./Pages/ForgotPassword";
+import ResetPassword from "./Pages/ResetPassword";
+import ManageSubscription from "./Pages/ManageSubscription";
+import AddressBook from "./Pages/AddressBook";
+import SubscriptionPlans from "./Pages/SubscriptionPlans";
+import CreateSubscription from "./Pages/CreateSubscription";
+import ReviewSubscription from "./Pages/ReviewSubscription";
 
 /* Admin */
 import AdminLogin from "./Pages/AdminLogin";
@@ -27,6 +35,10 @@ import AdminCustomers from "./Pages/AdminCustomers";
 import AdminSubscriptions from "./Pages/AdminSubscriptions";
 import AdminBilling from "./Pages/AdminBilling";
 import AdminProtectedRoute from "./Components/AdminProtectedRoute";
+import AdminDeliveryBoys from "./Pages/AdminDeliveryBoys";
+import AdminCustomerDetails from "./Pages/AdminCustomerDetails";
+import AdminSubscriptionDeliveries from "./pages/AdminSubscriptionDeliveries";
+import AdminMonthlyReport from "./pages/AdminMonthlyReport";
 
 
 /* Delivery */
@@ -35,15 +47,27 @@ import DeliveryDashboard from "./Pages/DeliveryDashboard";
 import DeliveryOrders from "./Pages/DeliveryOrders";
 import DeliveryProtectedRoute from "./Components/DeliveryProtectedRoute";
 
+
 /* Notification */
 import Notifications from "./Pages/Notifications";
 import NotificationSettings from "./Pages/NotificationSettings";
 
 export default function App() {
+  const location = useLocation();
+  const hideNavbar =  location.pathname.startsWith("/admin");
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar />
-      <div className="pt-[140px]">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-cyan-50 animate-gradient">
+    <div className="fixed inset-0 -z-10 overflow-hidden">
+
+      <div className="absolute w-96 h-96 bg-green-300 rounded-full blur-3xl opacity-20 animate-pulse top-10 left-10"></div>
+
+      <div className="absolute w-80 h-80 bg-blue-300 rounded-full blur-3xl opacity-20 animate-pulse bottom-20 right-20"></div>
+
+      <div className="absolute w-72 h-72 bg-yellow-300 rounded-full blur-3xl opacity-20 animate-pulse top-1/2 left-1/2"></div>
+
+    </div>
+      {!hideNavbar && <Navbar />}
+      <div className={hideNavbar ? "pt-8" : "pt-[140px]"}>
 
       <Routes>
         {/* =========================
@@ -58,9 +82,9 @@ export default function App() {
         <Route
           path="/checkout"
           element={
-            <ProtectedRoute>
+            <CustomerRoute>
               <Checkout />
-            </ProtectedRoute>
+            </CustomerRoute>
           }
         />
 
@@ -70,45 +94,57 @@ export default function App() {
         <Route
           path="/subscription-checkout"
           element={
-            <ProtectedRoute>
+            <CustomerRoute>
               <SubscriptionCheckout />
-            </ProtectedRoute>
+            </CustomerRoute>
           }
         />
+        <Route
+            path="/subscription/manage/:id"
+            element={
+              <CustomerRoute>
+                <ManageSubscription />
+              </CustomerRoute>
+            }
+          />
 
         {/* =========================
             CUSTOMER PROTECTED
         ========================= */}
-        <Route
+       <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <CustomerRoute>
               <CustomerDashboard />
-            </ProtectedRoute>
+            </CustomerRoute>
           }
         />
 
         <Route
           path="/order-history"
           element={
-            <ProtectedRoute>
+            <CustomerRoute>
               <OrderHistory />
-            </ProtectedRoute>
+            </CustomerRoute>
           }
         />
 
         <Route
           path="/track-order"
           element={
-            <ProtectedRoute>
+            <CustomerRoute>
               <TrackOrder />
-            </ProtectedRoute>
+            </CustomerRoute>
           }
         />
         <Route
           path="/forgot-password"
           element={<ForgotPassword />}
         />
+        <Route
+        path="/reset-password"
+        element={<ResetPassword />}
+      />
 
         {/* =========================
             ADMIN ROUTES
@@ -118,54 +154,53 @@ export default function App() {
         <Route
           path="/admin"
           element={
-            <AdminProtectedRoute>
+            <AdminRoute>
               <AdminDashboard />
-            </AdminProtectedRoute>
+            </AdminRoute>
           }
         />
-
         <Route
           path="/admin/orders"
           element={
-            <AdminProtectedRoute>
+            <AdminRoute>
               <AdminOrders />
-            </AdminProtectedRoute>
+            </AdminRoute>
           }
         />
 
         <Route
           path="/admin/products"
           element={
-            <AdminProtectedRoute>
+            <AdminRoute>
               <AdminProducts />
-            </AdminProtectedRoute>
+            </AdminRoute>
           }
         />
 
         <Route
           path="/admin/customers"
           element={
-            <AdminProtectedRoute>
+            <AdminRoute>
               <AdminCustomers />
-            </AdminProtectedRoute>
+            </AdminRoute>
           }
         />
 
         <Route
           path="/admin/subscriptions"
           element={
-            <AdminProtectedRoute>
+            <AdminRoute>
               <AdminSubscriptions />
-            </AdminProtectedRoute>
+            </AdminRoute>
           }
         />
 
         <Route
           path="/admin/billing"
           element={
-            <AdminProtectedRoute>
+            <AdminRoute>
               <AdminBilling />
-            </AdminProtectedRoute>
+            </AdminRoute>
           }
         />
 
@@ -175,20 +210,20 @@ export default function App() {
         <Route path="/delivery-login" element={<DeliveryLogin />} />
 
         <Route
-          path="/delivery"
-          element={
-            <DeliveryProtectedRoute>
-              <DeliveryDashboard />
-            </DeliveryProtectedRoute>
-          }
-        />
+            path="/delivery"
+            element={
+              <DeliveryRoute>
+                <DeliveryDashboard />
+              </DeliveryRoute>
+            }
+          />
 
         <Route
           path="/delivery/orders"
           element={
-            <DeliveryProtectedRoute>
+            <DeliveryRoute>
               <DeliveryOrders />
-            </DeliveryProtectedRoute>
+            </DeliveryRoute>
           }
         />
         <Route
@@ -199,7 +234,40 @@ export default function App() {
           path="/notification-settings"
           element={<NotificationSettings />}
         />
+        <Route
+          path="/address-book"
+          element={<AddressBook />}
+        />
+        <Route
+          path="/subscription-plans"
+          element={<SubscriptionPlans />}
+        />
+        <Route
+            path="/subscription/create/:productId"
+            element={<CreateSubscription />}
+        />
+        <Route
+          path="/subscription/review"
+          element={<ReviewSubscription />}
+        />
+        <Route
+          path="/admin/delivery-boys"
+          element={<AdminDeliveryBoys />}
+        />
+        <Route
+          path="/admin/customers/:id"
+          element={<AdminCustomerDetails />}
+        />
+        <Route
+          path="/admin/subscription-deliveries"
+          element={<AdminSubscriptionDeliveries />}
+        />
+        <Route
+          path="/admin/monthly-report"
+          element={<AdminMonthlyReport />}
+        />
       </Routes>
+      
       </div>
     </div>
   );

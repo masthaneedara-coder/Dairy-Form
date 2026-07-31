@@ -1,18 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { auth, db } from "../firebase";
-
-import {
-  collection,
-  addDoc,
-  getDocs,
-} from "firebase/firestore";
-
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
+import { registerCustomer, loginCustomer, deliveryLogin } from "../config/api";
+import { adminLogin } from "../services/adminService";
+import { useAuthSession } from "../context/AuthSessionContext";
 
 import {
   setCustomerLogin,
@@ -24,6 +15,8 @@ import {
 
 export default function Auth() {
   const navigate = useNavigate();
+  const { login } = useAuthSession();
+  const [loading, setLoading] = useState(false);
 
   /* -----------------------------
      STATES
@@ -41,6 +34,7 @@ export default function Auth() {
   /* -----------------------------
      REDIRECT
   ------------------------------*/
+ 
 
   const redirectUser = (defaultPath = "/") => {
     const redirectPath = getRedirectAfterLogin();
@@ -56,190 +50,168 @@ export default function Auth() {
   /* -----------------------------
      CUSTOMER SIGNUP
   ------------------------------*/
+ const handleCustomerSignup = async () => {
+  if (!name || !email || !mobile || !password) {
+    alert("Please fill all fields");
+    return;
+  }
 
-  const handleCustomerSignup = async () => {
-    if (!name || !email || !mobile || !password) {
-      alert("Please fill all fields");
-      return;
-    }
+  try {
+    setLoading(true);
 
-    if (password.length < 6) {
-      alert("Password must be at least 6 characters");
-      return;
-    }
+    const res = await registerCustomer({
+      full_name: name,
+      phone: mobile,
+      email,
+      password,
+    });
 
-    try {
-      const userCredential =
-        await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
+    alert(res.message);
 
-      await addDoc(collection(db, "customers"), {
-        uid: userCredential.user.uid,
-        name,
-        email,
-        mobile,
-      });
+    setName("");
+    setEmail("");
+    setMobile("");
+    setPassword("");
+    setLoginId("");
 
-      alert("Signup Successful");
+    setIsLogin(true);
 
-      setName("");
-      setEmail("");
-      setMobile("");
-      setPassword("");
-
-      setIsLogin(true);
-
-    } catch (error) {
-      console.error(error);
-      alert(error.message);
-    }
-  };
-
+  } catch (err) {
+    console.error(err);
+    alert(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
   /* -----------------------------
      CUSTOMER LOGIN
      Mobile OR Email
   ------------------------------*/
+ const handleCustomerLogin = async () => {
+  if (!loginId || !password) {
+    alert("Please enter Email and Password");
+    return;
+  }
 
-  const handleCustomerLogin = async () => {
+  try {
+    setLoading(true);
 
-    if (!loginId || !password) {
-      alert("Please enter Mobile/Email and Password");
+    const res = await loginCustomer(
+      loginId,
+      password
+    );
+
+    if (!res.success) {
+      alert(res.message);
       return;
     }
 
-    try {
+  setCustomerLogin(res.user);
 
-      let loginEmail = loginId;
+      // Update React Context immediately
+      login(res.user);
 
-      // Mobile Login
-      if (!loginId.includes("@")) {
-
-        const snapshot = await getDocs(
-          collection(db, "customers")
-        );
-
-        let found = false;
-
-        snapshot.forEach((doc) => {
-
-          const data = doc.data();
-
-          if (data.mobile === loginId) {
-            loginEmail = data.email;
-            found = true;
-          }
-
-        });
-
-        if (!found) {
-          alert("Customer not found");
-          return;
-        }
-
-      }
-
-      // Firebase Login
-
-      const userCredential =
-        await signInWithEmailAndPassword(
-          auth,
-          loginEmail,
-          password
-        );
-
-      const uid = userCredential.user.uid;
-
-      const snapshot = await getDocs(
-        collection(db, "customers")
+      localStorage.setItem(
+        "supabase_session",
+        JSON.stringify(res.session)
       );
 
-      let customer = null;
+        console.log(
+          "Local Storage:",
+          localStorage.getItem("customer")
+        );
+   
+    redirectUser("/dashboard");
 
-      snapshot.forEach((doc) => {
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Login failed");
+  } finally {
+    setLoading(false);
+  }
+};
 
-        const data = doc.data();
-
-        if (data.uid === uid) {
-          customer = data;
-        }
-
-      });
-
-      if (!customer) {
-        alert("Customer profile not found");
-        return;
-      }
-
-      setCustomerLogin({
-        name: customer.name,
-        phone: customer.mobile,
-      });
-
-      redirectUser("/dashboard");
-
-    } catch (error) {
-
-      console.error(error);
-
-      switch (error.code) {
-
-        case "auth/user-not-found":
-          alert("No account found.");
-          break;
-
-        case "auth/wrong-password":
-        case "auth/invalid-credential":
-          alert("Invalid password.");
-          break;
-
-        case "auth/invalid-email":
-          alert("Invalid Email.");
-          break;
-
-        default:
-          alert(error.message);
-
-      }
-
-    }
-
-  };
+ 
     /* -----------------------------
      ADMIN LOGIN
   ------------------------------*/
 
-  const handleAdminLogin = () => {
-    if (loginId === "admin" && password === "1234") {
-      setAdminLogin({
-        name: "Admin",
-      });
+ const handleAdminLogin = async () => {
+  if (!loginId || !password) {
+    alert("Please enter Email and Password");
+    return;
+  }
 
-      navigate("/admin");
-      return;
-    }
+  try {
+    const admin = await adminLogin(loginId, password);
 
-    alert("Invalid admin credentials");
-  };
+    setAdminLogin({
+      id: admin.id,
+      name: admin.full_name,
+      email: admin.email,
+      phone: admin.phone,
+      role: admin.role,
+    });
+
+    navigate("/admin");
+
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Invalid admin credentials");
+  }
+};
 
   /* -----------------------------
      DELIVERY LOGIN
   ------------------------------*/
 
-  const handleDeliveryLogin = () => {
-    if (loginId === "delivery" && password === "1234") {
-      setDeliveryLogin({
-        name: "Delivery Boy",
-      });
+ const handleDeliveryLogin = async () => {
 
-      navigate("/delivery");
-      return;
+    if (!loginId || !password) {
+        alert("Please enter mobile number and password");
+        return;
     }
 
-    alert("Invalid delivery credentials");
-  };
+    try {
+
+        setLoading(true);
+
+        const res = await deliveryLogin(
+            loginId,
+            password
+        );
+
+        if (!res.success) {
+            alert(res.message);
+            return;
+        }
+
+        setDeliveryLogin({
+            id: res.deliveryBoy.id,
+            name: res.deliveryBoy.full_name,
+            phone: res.deliveryBoy.phone,
+            role: "delivery",
+        });
+
+        localStorage.setItem(
+            "deliveryBoy",
+            JSON.stringify(res.deliveryBoy)
+        );
+
+        navigate("/delivery");
+
+    } catch (err) {
+
+        console.error(err);
+        alert(err.message || "Delivery login failed");
+
+    } finally {
+
+        setLoading(false);
+
+    }
+
+};
 
   /* -----------------------------
      SUBMIT
@@ -350,8 +322,8 @@ export default function Auth() {
                   ? "Customer Login"
                   : "Customer Signup"
                 : selectedRole === "admin"
-                ? "Admin Login"
-                : "Delivery Login"}
+                ? "Admin Email"
+                : "Delivery Username"}
 
             </h2>
 
@@ -448,7 +420,7 @@ export default function Auth() {
 
                 <input
                   type="text"
-                  placeholder="Mobile Number or Email"
+                  placeholder="Enter Phone Number or Email Address"
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value)}
                   className="w-full border border-green-200 rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-green-400"
@@ -472,8 +444,8 @@ export default function Auth() {
                 type="text"
                 placeholder={
                   selectedRole === "admin"
-                    ? "Admin Username"
-                    : "Delivery Username"
+                    ? "Admin Email"
+                      : "Delivery Username"
                 }
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
@@ -530,12 +502,15 @@ export default function Auth() {
 
             {selectedRole === "customer" && isLogin && (
 
-              <button
-                onClick={() => navigate("/forgot-password")}
-                className="w-full text-green-700 hover:underline font-semibold"
-              >
-                Forgot Password?
-              </button>
+              <div className="text-right mt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/forgot-password")}
+                  className="text-blue-600 hover:underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
 
             )}
                         {/* Demo Credentials */}

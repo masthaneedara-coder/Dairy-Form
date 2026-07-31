@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { fetchOrdersByPhone } from "../config/api";
-import { getCustomerPhone, isCustomerLoggedIn } from "../config/auth";
+import { getCustomerOrders } from "../services/orderService";
+import { useAuthSession } from "../context/AuthSessionContext";
 
 export default function OrderHistory() {
   const navigate = useNavigate();
+  const { customer } = useAuthSession();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const orderScrollRef = useRef(null);
@@ -21,18 +22,23 @@ export default function OrderHistory() {
         behavior: "smooth",
       });
     };
+   
 
   useEffect(() => {
     const loadOrders = async () => {
-      if (!isCustomerLoggedIn()) {
+      if (!customer) {
         navigate("/auth");
         return;
       }
 
       try {
         setLoading(true);
-        const phone = getCustomerPhone();
-        const data = await fetchOrdersByPhone(phone);
+        if (!customer?.id) {
+          navigate("/auth");
+          return;
+        }
+
+const data = await getCustomerOrders(customer.id);
 
         const list = Array.isArray(data)
           ? data
@@ -50,7 +56,7 @@ export default function OrderHistory() {
     };
 
     loadOrders();
-  }, [navigate]);
+  }, [navigate, customer]);
 
   const totalOrders = useMemo(() => orders.length, [orders]);
 
@@ -88,30 +94,45 @@ export default function OrderHistory() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 via-white to-emerald-50 px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+    <div className="min-h-screen bg-gradient-to-b from-green-50 via-white to-emerald-50
+px-2 sm:px-4 md:px-6
+py-3 sm:py-6">
       <div className="max-w-6xl mx-auto">
         {/* HERO HEADER */}
-        <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-r from-green-700 via-emerald-600 to-green-700 p-6 sm:p-8 text-white shadow-2xl mb-6">
+        <div className="relative overflow-hidden rounded-3xl
+bg-gradient-to-r from-green-700 via-emerald-600 to-green-700
+p-4 sm:p-6 md:p-8
+text-white shadow-2xl">
           <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/10 blur-3xl"></div>
           <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/10 blur-3xl"></div>
 
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div>
-              <p className="text-white/80 text-sm sm:text-base">Track your purchases</p>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mt-1">
+              <p className="text-white/80 text-base">Track your purchases</p>
+              <h1 className="text-2xl
+              sm:text-4xl
+              md:text-5xl
+              font-black
+              leading-tight">
                 📦 Order History
               </h1>
-              <p className="mt-2 text-white/90 text-sm sm:text-base">
+              <p className="mt-2 text-white/90 text-base">
                 View all your product orders, payment details and delivery status
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="bg-white/10 backdrop-blur rounded-2xl px-5 py-4 min-w-[140px]">
+            <div className="
+              grid
+            grid-cols-2
+            gap-2
+            sm:gap-4
+            w-full
+            ">
+              <div className="bg-white/10 backdrop-blur rounded-2xl px-5 py-4 w-full">
                 <p className="text-white/70 text-xs sm:text-sm">Total Orders</p>
                 <h3 className="text-2xl sm:text-3xl font-black mt-1">{totalOrders}</h3>
               </div>
-              <div className="bg-white/10 backdrop-blur rounded-2xl px-5 py-4 min-w-[140px]">
+              <div className="bg-white/10 backdrop-blur rounded-2xl px-5 py-4 w-full">
                 <p className="text-white/70 text-xs sm:text-sm">Total Spent</p>
                 <h3 className="text-2xl sm:text-3xl font-black mt-1">
                   {formatMoney(totalSpent)}
@@ -125,12 +146,18 @@ export default function OrderHistory() {
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-6">
           <div>
             <h2 className="text-2xl font-black text-green-700">Your Orders</h2>
-            <p className="text-gray-500 text-sm sm:text-base">
+            <p className="text-gray-500 text-base">
               Latest orders are shown first
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="
+            flex
+            flex-col
+            sm:flex-row
+            gap-3
+            w-full
+            sm:w-auto">
             <button
               onClick={() => navigate("/dashboard")}
               className="px-5 py-3 rounded-2xl bg-white border border-green-200 text-green-700 font-bold shadow-sm hover:shadow transition"
@@ -230,10 +257,10 @@ export default function OrderHistory() {
                           }}
                           className="
                             snap-start shrink-0 text-left
-                            w-[92%] sm:w-[360px] lg:w-[390px]
+                            w-full sm:w-[360px] lg:w-[390px]
                             rounded-[28px] border border-green-100
                             bg-gradient-to-br from-white to-slate-50
-                            p-5 shadow-md hover:shadow-xl transition-all duration-300
+                            p-5 sm:p-5 shadow-md hover:shadow-xl transition-all duration-300
                             hover:-translate-y-1
                           "
                         >
@@ -246,7 +273,7 @@ export default function OrderHistory() {
                                 #{order.orderId || index + 1}
                               </h3>
                               <p className="text-sm text-gray-500 mt-1">
-                                {order.date || order.createdAt || "-"}
+                                {order.date || order.createdAt}
                               </p>
                             </div>
 
@@ -262,22 +289,22 @@ export default function OrderHistory() {
                           <div className="grid grid-cols-2 gap-3 mt-5">
                             <MiniOrderCard
                               label="Amount"
-                              value={formatMoney(order.totalAmount || order.total || 0)}
+                              value={formatMoney(order.total_amount)}
                               color="green"
                             />
                             <MiniOrderCard
                               label="Items"
-                              value={`${itemsArray.length}`}
+                              value={order.order_items?.length || 0}
                               color="blue"
                             />
                             <MiniOrderCard
                               label="Payment"
-                              value={order.paymentMethod || "-"}
+                              value={order.payment_status}
                               color="yellow"
                             />
                             <MiniOrderCard
                               label="Area"
-                              value={order.area || "-"}
+                              value={order.addresses?.area || order.area || "-"}
                               color="purple"
                             />
                           </div>
@@ -285,7 +312,16 @@ export default function OrderHistory() {
                           <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <p className="text-sm text-gray-500 font-medium">Address</p>
                             <p className="text-gray-800 font-semibold mt-1 break-words line-clamp-2">
-                              {order.address || "-"}
+                              {order.addresses
+                                ? [
+                                    order.addresses.house_no,
+                                    order.addresses.street,
+                                    order.addresses.area,
+                                    order.addresses.city,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(", ")
+                                : order.address || "-"}
                             </p>
                           </div>
 
@@ -316,10 +352,13 @@ export default function OrderHistory() {
               {/* FULL ORDER DETAILS */}
               <div className="space-y-5">
                 {orders.map((order, index) => {
-                  const itemsArray = String(order.items || "")
-                    .split(",")
-                    .map((item) => item.trim())
-                    .filter(Boolean);
+                  const itemsArray =
+                    order.order_items?.map((item) => ({
+                      name: item.products?.name || "Product",
+                      quantity: item.quantity,
+                      price: item.total_price,
+                      image: item.products?.image,
+                    })) || [];
 
                   return (
                     <div
@@ -331,37 +370,41 @@ export default function OrderHistory() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-3">
                             <h2 className="text-2xl font-black text-green-700 break-all">
-                              Order #{order.orderId || index + 1}
+                               Order #{order.order_number}
                             </h2>
 
                             <span
                               className={`px-3 py-1.5 rounded-full text-sm font-bold ${getStatusClasses(
-                                order.status || "Pending"
+                                order.payment_status || "Pending"
                               )}`}
                             >
-                              {order.status || "Pending"}
+                              {order.payment_status || "Pending"}
                             </span>
                           </div>
 
                           <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-5">
                             <MetaCard
                               label="Order Date"
-                              value={order.date || order.createdAt || "-"}
+                              value={new Date(order.order_date).toLocaleDateString("en-IN")}
                               color="green"
                             />
                             <MetaCard
                               label="Payment Method"
-                              value={order.paymentMethod || "-"}
+                              value={order.payment_status || "-"}
                               color="blue"
                             />
                             <MetaCard
                               label="Delivery Area"
-                              value={order.area || "-"}
+                              value={
+                                    order.addresses?.area ||
+                                    order.area ||
+                                    "-"
+                                  }
                               color="yellow"
                             />
                             <MetaCard
                               label="Total Amount"
-                              value={formatMoney(order.totalAmount || order.total || 0)}
+                              value={formatMoney(order.total_amount)}
                               color="purple"
                             />
                           </div>
@@ -369,7 +412,16 @@ export default function OrderHistory() {
                           <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <p className="text-sm text-gray-500 font-medium">Delivery Address</p>
                             <p className="text-gray-800 font-semibold mt-1 break-words">
-                              {order.address || "-"}
+                              {order.addresses
+        ? [
+            order.addresses.house_no,
+            order.addresses.street,
+            order.addresses.area,
+            order.addresses.city,
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : order.address || "-"}
                             </p>
                           </div>
                         </div>
@@ -379,42 +431,50 @@ export default function OrderHistory() {
                           <div className="rounded-3xl bg-gradient-to-br from-green-600 to-emerald-600 text-white p-5 shadow-lg">
                             <p className="text-white/80 text-sm">Order Value</p>
                             <h3 className="text-3xl font-black mt-2">
-                              {formatMoney(order.totalAmount || order.total || 0)}
+                              {formatMoney(order.total_amount || order.total || 0)}
                             </h3>
                             <p className="text-sm text-white/80 mt-3">
-                              {itemsArray.length} item{itemsArray.length !== 1 ? "s" : ""}
+                              {order.order_items?.length || 0} item{order.order_items?.length || 0}
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      {itemsArray.length > 0 && (
+                      {order.order_items?.length || 0 > 0 && (
                         <div className="mt-5 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 sm:p-5">
                           <div className="flex items-center justify-between gap-3 mb-4">
                             <h3 className="text-lg sm:text-xl font-black text-gray-800">
                               🧾 Ordered Items
                             </h3>
                             <span className="text-sm text-gray-500">
-                              {itemsArray.length} item{itemsArray.length !== 1 ? "s" : ""}
+                              {order.order_items?.length || 0} item{order.order_items?.length || 0}
                             </span>
                           </div>
 
                           <div className="grid gap-3">
-                            {itemsArray.map((item, i) => (
-                              <div
-                                key={i}
-                                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex items-start gap-3 hover:shadow-sm transition"
-                              >
-                                <div className="w-9 h-9 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-black shrink-0">
-                                  {i + 1}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-gray-800 font-semibold break-words">
-                                    {item}
+                           {itemsArray.map((item, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center gap-3 rounded-xl border p-3"
+                                >
+                                  <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    className="w-14 h-14 rounded-lg object-cover"
+                                  />
+
+                                  <div className="flex-1">
+                                    <p className="font-bold">{item.name}</p>
+                                    <p className="text-sm text-gray-500">
+                                      Qty: {item.quantity}
+                                    </p>
+                                  </div>
+
+                                  <p className="font-bold">
+                                    {formatMoney(item.price)}
                                   </p>
                                 </div>
-                              </div>
-                            ))}
+                              ))}
                           </div>
                         </div>
                       )}
@@ -424,7 +484,13 @@ export default function OrderHistory() {
                           Need more products? You can place a new order anytime.
                         </p>
 
-                        <div className="flex flex-wrap gap-3">
+                        <div className="
+                          flex
+                          flex-col
+                          sm:flex-row
+                          gap-3
+                          w-full
+                          sm:w-auto">
                           <button
                             onClick={() => navigate("/products")}
                             className="px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold shadow"
@@ -478,7 +544,7 @@ function MiniOrderCard({ label, value, color = "green" }) {
   return (
     <div className={`rounded-2xl border p-3 ${styles[color] || styles.green}`}>
       <p className="text-xs text-gray-500 font-medium">{label}</p>
-      <h3 className="text-sm sm:text-base font-black mt-1 break-words">
+      <h3 className="text-base font-black mt-1 break-words">
         {value}
       </h3>
     </div>

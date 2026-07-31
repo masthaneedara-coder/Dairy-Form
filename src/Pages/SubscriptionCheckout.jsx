@@ -9,6 +9,7 @@ import {
 } from "../config/subscription";
 import { PAYMENT_METHODS } from "../config/appConfig";
 import { useNotifications } from "../context/NotificationContext";
+import toast from "react-hot-toast";
 
 
 export default function SubscriptionCheckout() {

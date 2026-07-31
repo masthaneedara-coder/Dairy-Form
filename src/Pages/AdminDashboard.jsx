@@ -193,6 +193,8 @@ export default function AdminDashboard() {
             icon="💰"
           />
         </div>
+        
+       
 
         {/* QUICK ACTIONS */}
         <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
@@ -224,6 +226,20 @@ export default function AdminDashboard() {
             color="orange"
             onClick={() => navigate("/admin/subscriptions")}
           />
+          <ActionCard
+            icon="📊"
+            title="Monthly Report"
+            desc="View delivered, missed, billing and payment reports."
+            color="blue"
+            onClick={() => navigate("/admin/monthly-report")}
+          />
+          <ActionCard
+               icon="🚚"
+              title="Today's Deliveries"
+              subtitle="Generate & Manage Subscription Deliveries"
+              color="green"             
+              onClick={() => navigate("/admin/subscription-deliveries")}
+            />
         </div>
 
         {/* LOW STOCK + PRODUCT TABLE */}

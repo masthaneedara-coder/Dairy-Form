@@ -344,7 +344,7 @@ const goToOrder = () => {
               <h5 className="text-lg font-black text-green-800">Contact</h5>
               <div className="mt-3 space-y-2 text-sm text-gray-600">
                 <p>📍 Dammaiguda / ECIL / Nearby Areas</p>
-                <p>📞 +91 XXXXX XXXXX</p>
+                <p>📞 +91 9989663838</p>
                 <p>🚚 Daily Milk Delivery Available</p>
               </div>
             </div>

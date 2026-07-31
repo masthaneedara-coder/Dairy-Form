@@ -1,72 +1,159 @@
-import { STORAGE_KEYS, USER_ROLES } from "./appConfig";
+// ============================================
+// Storage Keys
+// ============================================
 
-export const isCustomerLoggedIn = () =>
-  localStorage.getItem(STORAGE_KEYS.CUSTOMER_LOGIN) === "true";
+const CUSTOMER_KEY = "customer";
+const ADMIN_KEY = "admin";
+const DELIVERY_KEY = "delivery";
+const REDIRECT_KEY = "redirectAfterLogin";
 
-export const setCustomerLogin = ({ name, phone }) => {
-  localStorage.setItem(STORAGE_KEYS.CUSTOMER_LOGIN, "true");
-  localStorage.setItem(STORAGE_KEYS.USER_ROLE, USER_ROLES.CUSTOMER);
-  localStorage.setItem(STORAGE_KEYS.CUSTOMER_NAME, name || "");
-  localStorage.setItem(STORAGE_KEYS.CUSTOMER_PHONE, phone || "");
-};
+// ============================================
+// CUSTOMER
+// ============================================
 
-export const getCustomerName = () =>
-  localStorage.getItem(STORAGE_KEYS.CUSTOMER_NAME) || "";
 
-export const getCustomerPhone = () =>
-  localStorage.getItem(STORAGE_KEYS.CUSTOMER_PHONE) || "";
 
-export const logoutCustomer = () => {
-  localStorage.removeItem(STORAGE_KEYS.CUSTOMER_LOGIN);
-  localStorage.removeItem(STORAGE_KEYS.USER_ROLE);
-  localStorage.removeItem(STORAGE_KEYS.CUSTOMER_NAME);
-  localStorage.removeItem(STORAGE_KEYS.CUSTOMER_PHONE);
-};
+export function setCustomerLogin(customer) {
+  localStorage.setItem(
+    CUSTOMER_KEY,
+    JSON.stringify(customer)
+  );
+}
 
-export const setRedirectAfterLogin = (path) => {
-  localStorage.setItem(STORAGE_KEYS.REDIRECT_AFTER_LOGIN, path);
-};
+export function getCustomer() {
+  try {
+    return JSON.parse(
+      localStorage.getItem(CUSTOMER_KEY) || "null"
+    );
+  } catch {
+    return null;
+  }
+}
+export function getCustomerId() {
+  return getCustomer()?.id || null;
+}
 
-export const getRedirectAfterLogin = () =>
-  localStorage.getItem(STORAGE_KEYS.REDIRECT_AFTER_LOGIN) || "";
+export function getCustomerName() {
+  return getCustomer()?.full_name || getCustomer()?.name || "";
+}
 
-export const clearRedirectAfterLogin = () => {
-  localStorage.removeItem(STORAGE_KEYS.REDIRECT_AFTER_LOGIN);
-};
+export function getCustomerPhone() {
+  return getCustomer()?.phone || "";
+}
 
-export const setAdminLogin = ({ name }) => {
-  localStorage.setItem(STORAGE_KEYS.ADMIN_LOGIN, "true");
-  localStorage.setItem(STORAGE_KEYS.ADMIN_NAME, name || "Admin");
-  localStorage.setItem(STORAGE_KEYS.USER_ROLE, USER_ROLES.ADMIN);
-};
+export function isCustomerLoggedIn() {
+  return !!getCustomer();
+}
 
-export const isAdminLoggedIn = () =>
-  localStorage.getItem(STORAGE_KEYS.ADMIN_LOGIN) === "true";
+export function logoutCustomer() {
+  localStorage.removeItem(CUSTOMER_KEY);
+}
 
-export const logoutAdmin = () => {
-  localStorage.removeItem(STORAGE_KEYS.ADMIN_LOGIN);
-  localStorage.removeItem(STORAGE_KEYS.ADMIN_NAME);
-  localStorage.removeItem(STORAGE_KEYS.USER_ROLE);
-};
+// ============================================
+// ADMIN
+// ============================================
 
-export const setDeliveryLogin = ({ name, phone }) => {
-  localStorage.setItem(STORAGE_KEYS.DELIVERY_LOGIN, "true");
-  localStorage.setItem(STORAGE_KEYS.DELIVERY_NAME, name || "");
-  localStorage.setItem(STORAGE_KEYS.DELIVERY_PHONE, phone || "");
-  localStorage.setItem(STORAGE_KEYS.USER_ROLE, USER_ROLES.DELIVERY);
-};
+export function setAdminLogin(admin) {
+  localStorage.setItem(ADMIN_KEY, JSON.stringify(admin));
+}
 
-export const isDeliveryLoggedIn = () =>
-  localStorage.getItem(STORAGE_KEYS.DELIVERY_LOGIN) === "true";
+export function getAdmin() {
+  try {
+    return JSON.parse(localStorage.getItem(ADMIN_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
 
-export const logoutDelivery = () => {
-  localStorage.removeItem(STORAGE_KEYS.DELIVERY_LOGIN);
-  localStorage.removeItem(STORAGE_KEYS.DELIVERY_NAME);
-  localStorage.removeItem(STORAGE_KEYS.DELIVERY_PHONE);
-  localStorage.removeItem(STORAGE_KEYS.USER_ROLE);
-};
-export const getDeliveryName = () =>
-  localStorage.getItem(STORAGE_KEYS.DELIVERY_NAME) || "";
+export function getAdminId() {
+  return getAdmin()?.id || null;
+}
 
-export const getDeliveryPhone = () =>
-  localStorage.getItem(STORAGE_KEYS.DELIVERY_PHONE) || "";
+export function getAdminName() {
+  return getAdmin()?.full_name || getAdmin()?.name || "";
+}
+
+export function isAdminLoggedIn() {
+  return !!getAdmin();
+}
+
+export function logoutAdmin() {
+  localStorage.removeItem(ADMIN_KEY);
+}
+
+// ============================================
+// DELIVERY
+// ============================================
+
+export function setDeliveryLogin(delivery) {
+  localStorage.setItem(DELIVERY_KEY, JSON.stringify(delivery));
+}
+
+export function getDelivery() {
+  try {
+    return JSON.parse(localStorage.getItem(DELIVERY_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+export function getDeliveryId() {
+  return getDelivery()?.id || null;
+}
+
+export function getDeliveryName() {
+  return getDelivery()?.full_name || getDelivery()?.name || "";
+}
+
+export function getDeliveryPhone() {
+  return getDelivery()?.phone || "";
+}
+
+export function isDeliveryLoggedIn() {
+  return !!getDelivery();
+}
+
+export function logoutDelivery() {
+  localStorage.removeItem(DELIVERY_KEY);
+}
+
+// ============================================
+// REDIRECT
+// ============================================
+
+export function setRedirectAfterLogin(path) {
+  localStorage.setItem(REDIRECT_KEY, path);
+}
+
+export function getRedirectAfterLogin() {
+  return localStorage.getItem(REDIRECT_KEY);
+}
+
+export function clearRedirectAfterLogin() {
+  localStorage.removeItem(REDIRECT_KEY);
+}
+// ============================================
+// ROLE HELPERS
+// ============================================
+
+export function getCurrentRole() {
+  if (getCustomer()) return "customer";
+
+  if (getAdmin()) return "admin";
+
+  if (getDelivery()) return "delivery";
+
+  return null;
+}
+
+export function isCustomer() {
+  return getCurrentRole() === "customer";
+}
+
+export function isAdmin() {
+  return getCurrentRole() === "admin";
+}
+
+export function isDelivery() {
+  return getCurrentRole() === "delivery";
+}

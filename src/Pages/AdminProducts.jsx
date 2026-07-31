@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../Components/AdminLayout";
 import {
-   fetchProducts,
+  fetchProducts,
+  fetchCategories,
   addProduct,
   updateProduct,
   deleteProduct,
+  uploadProductImage,
 } from "../config/api";
-
+import ProductSizeEditor from "../Components/admin/ProductSizes";
 
 const EMPTY_PRODUCT = {
   id: "",
@@ -14,7 +16,7 @@ const EMPTY_PRODUCT = {
   price: "",
   stock: "",
   image: "",
-  category: "",
+  category_id: "",
 };
 
 const DEFAULT_IMAGE =
@@ -22,6 +24,7 @@ const DEFAULT_IMAGE =
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
@@ -30,9 +33,13 @@ export default function AdminProducts() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showSizeModal, setShowSizeModal] = useState(false);
+
+const [selectedProduct, setSelectedProduct] = useState(null);
 
   const [newProduct, setNewProduct] = useState(EMPTY_PRODUCT);
   const [editingProduct, setEditingProduct] = useState(null);
+  
 
   const loadProducts = async () => {
     try {
@@ -56,20 +63,31 @@ export default function AdminProducts() {
 
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, []);
 
-  const categories = useMemo(() => {
-    const list = products
-      .map((p) => String(p.category || "").trim())
-      .filter(Boolean);
+  const loadCategories = async () => {
+    const list = await fetchCategories();
+    console.log("Categories from API:", list);
+    setCategories(list);
+};
+useEffect(() => {
+    console.log("Categories state:", categories);
+}, [categories]);
+  
 
-    return ["All", ...new Set(list)];
-  }, [products]);
+  const categoryOptions = useMemo(() => {
+  const list = products
+    .map((p) => String(p.categories?.name || "").trim())
+    .filter(Boolean);
+
+  return ["All", ...new Set(list)];
+}, [products]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const name = String(product.name || "").toLowerCase();
-      const category = String(product.category || "");
+      const category = String(product.categories.name || "");
       const stock = Number(product.stock || 0);
 
       const matchesSearch =
@@ -178,7 +196,7 @@ export default function AdminProducts() {
         stock: Number(editingProduct.stock || 0),
       };
 
-      const res = await updateProduct(payload);
+      const res = await updateProduct(payload.id, payload);
 
       if (res?.success) {
         alert("Product updated successfully");
@@ -212,6 +230,7 @@ export default function AdminProducts() {
       alert("Failed to delete product");
     }
   };
+ 
 
   return (
     <AdminLayout title="Products Management">
@@ -287,7 +306,7 @@ export default function AdminProducts() {
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
               >
-                {categories.map((cat) => (
+                {categoryOptions.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat || "Uncategorized"}
                   </option>
@@ -372,7 +391,7 @@ export default function AdminProducts() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 mt-4">
-                          <InfoBox label="Category" value={product.category || "-"} />
+                          <InfoBox label="Category" value={product.categories.name || "-"} />
                           <InfoBox label="Stock" value={product.stock || 0} />
                           <InfoBox label="Price" value={formatMoney(product.price)} />
                           <InfoBox
@@ -395,13 +414,24 @@ export default function AdminProducts() {
                             price: product.price || "",
                             stock: product.stock || "",
                             image: product.image || "",
-                            category: product.category || "",
+                            category_id: product.category_id || ""
                           });
                           setShowEditModal(true);
                         }}
                         className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow text-sm sm:text-base"
                       >
                         Edit
+                      </button>
+                     <button
+                        onClick={() => {
+                          console.log("Sizes button clicked", product);
+
+                          setSelectedProduct(product);
+                          setShowSizeModal(true);
+                        }}
+                        className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow"
+                      >
+                        Sizes
                       </button>
 
                       <button
@@ -421,31 +451,44 @@ export default function AdminProducts() {
         {/* ADD MODAL */}
         {showAddModal && (
           <ProductModal
-            title="Add New Product"
-            product={newProduct}
-            setProduct={setNewProduct}
-            onClose={() => {
-              setShowAddModal(false);
-              resetNewProduct();
-            }}
-            onSave={handleAddProduct}
-            saveText="Add Product"
+              title="Add New Product"
+              product={newProduct}
+              setProduct={setNewProduct}
+              categories={categories}
+              onClose={() => {
+                  setShowAddModal(false);
+                  resetNewProduct();
+              }}
+              onSave={handleAddProduct}
+              saveText="Add Product"
           />
+        )}
+        {showSizeModal && selectedProduct && (
+
+            <ProductSizeEditor
+                product={selectedProduct}
+                onClose={()=>{
+                    setShowSizeModal(false);
+                    setSelectedProduct(null);
+                }}
+            />
+
         )}
 
         {/* EDIT MODAL */}
         {showEditModal && editingProduct && (
-          <ProductModal
+         <ProductModal
             title="Edit Product"
             product={editingProduct}
             setProduct={setEditingProduct}
+            categories={categories}
             onClose={() => {
-              setShowEditModal(false);
-              setEditingProduct(null);
+                setShowEditModal(false);
+                setEditingProduct(null);
             }}
             onSave={handleUpdateProduct}
             saveText="Save Changes"
-          />
+        />
         )}
       </div>
     </AdminLayout>
@@ -489,13 +532,15 @@ function InfoBox({ label, value }) {
 }
 
 function ProductModal({
-  title,
-  product,
-  setProduct,
-  onClose,
-  onSave,
-  saveText,
+    title,
+    product,
+    setProduct,
+    categories = [],
+    onClose,
+    onSave,
+    saveText,
 }) {
+  const [uploading, setUploading] = useState(false);
   const updateField = (field, value) => {
     setProduct((prev) => ({
       ...prev,
@@ -505,7 +550,20 @@ function ProductModal({
 
   return (
     <div className="fixed inset-0 z-[999] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center px-3 py-3 sm:py-4">
-      <div className="w-full max-w-3xl bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto">
+      <div className="
+    w-full
+    sm:w-[95%]
+    lg:w-[90%]
+    xl:w-[80%]
+    max-w-6xl
+    bg-white
+    rounded-t-3xl
+    sm:rounded-3xl
+    shadow-2xl
+    max-h-[95vh]
+    flex
+    flex-col
+">
         <div className="bg-gradient-to-r from-green-700 to-emerald-600 text-white px-4 sm:px-6 py-4 sm:py-5 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl sm:text-2xl font-black">{title}</h2>
@@ -522,7 +580,7 @@ function ProductModal({
           </button>
         </div>
 
-        <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">
               Product ID
@@ -579,37 +637,80 @@ function ProductModal({
             <label className="block text-sm font-bold text-slate-700 mb-2">
               Category
             </label>
-            <input
-              type="text"
-              value={product.category || ""}
-              onChange={(e) => updateField("category", e.target.value)}
+           <select
+              value={product.category_id || ""}
+              onChange={(e) => updateField("category_id", e.target.value)}
               className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
-              placeholder="Milk / Curd / Ghee"
-            />
+          >
+              <option value="">Select Category</option>
+
+              {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                  </option>
+              ))}
+          </select>
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              Image URL
-            </label>
-            <input
-              type="text"
-              value={product.image || ""}
-              onChange={(e) => updateField("image", e.target.value)}
-              className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm sm:text-base outline-none focus:border-green-500"
-              placeholder="https://..."
-            />
-          </div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Product Image
+              </label>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+
+                  try {
+                    setUploading(true);
+
+                    const res = await uploadProductImage(file);
+
+                    updateField("image", res.image);
+
+                  } catch (err) {
+                    alert("Image upload failed");
+                  } finally {
+                    setUploading(false);
+                  }
+                }}
+                className="w-full border rounded-2xl p-3"
+              />
+
+              {uploading && (
+                <p className="text-green-600 mt-2">
+                  Uploading image...
+                </p>
+              )}
+            </div>
 
           <div className="md:col-span-2">
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-sm font-bold text-slate-700 mb-3">Preview</p>
 
-              <div className="flex flex-col sm:grid sm:grid-cols-[120px_1fr] gap-4 items-start">
+             <div className="
+                    flex
+                    flex-col
+                    lg:grid
+                    lg:grid-cols-[140px_1fr]
+                    gap-5
+                ">
                 <img
                   src={product.image || DEFAULT_IMAGE}
                   alt={product.name || "Preview"}
-                  className="w-full sm:w-[120px] h-36 sm:h-28 object-cover rounded-2xl border"
+                  className="
+                    w-full
+                    max-w-[180px]
+                    lg:w-[140px]
+                    h-40
+                    lg:h-32
+                    object-cover
+                    rounded-2xl
+                    border
+                "
                 />
 
                 <div className="min-w-0">
@@ -617,7 +718,9 @@ function ProductModal({
                     {product.name || "Product Name"}
                   </h3>
                   <p className="text-slate-500 mt-1 break-words">
-                    Category: {product.category || "-"}
+                    Category: {
+                        categories.find(c => c.id === product.category_id)?.name || "-"
+                    }
                   </p>
                   <p className="text-green-700 font-black text-lg sm:text-xl mt-3">
                     ₹{product.price || 0}
@@ -629,21 +732,69 @@ function ProductModal({
           </div>
         </div>
 
-        <div className="px-4 sm:px-6 pb-5 sm:pb-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
-          <button
-            onClick={onClose}
-            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSave}
-            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold shadow"
-          >
-            {saveText}
-          </button>
         </div>
-      </div>
+
+{/* ==============================
+   PRODUCT SIZES
+============================== */}
+<div className="
+    sticky
+    bottom-0
+    bg-white
+    border-t
+    px-4
+    sm:px-6
+    py-4
+">
+
+    <div className="
+        flex
+        flex-col
+        sm:flex-row
+        justify-end
+        gap-3
+    ">
+
+        <button
+            onClick={onClose}
+            className="
+                w-full
+                sm:w-auto
+                px-6
+                py-3
+                rounded-2xl
+                bg-slate-100
+                hover:bg-slate-200
+                font-bold
+            "
+        >
+            Cancel
+        </button>
+
+        <button
+            onClick={onSave}
+            className="
+                w-full
+                sm:w-auto
+                px-6
+                py-3
+                rounded-2xl
+                bg-green-600
+                hover:bg-green-700
+                text-white
+                font-bold
+            "
+        >
+            {saveText}
+        </button>
+
+    </div>
+
+</div>
+
+
+
+
     </div>
   );
 }
